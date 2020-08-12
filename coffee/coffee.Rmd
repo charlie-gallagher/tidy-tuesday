@@ -1,0 +1,227 @@
+---
+title: "Coffee"
+output: html_notebook
+---
+
+
+```{r, include=FALSE}
+# Get coffee
+coffee <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-07-07/coffee_ratings.csv')
+save(coffee, file = 'data/coffee.RData')
+
+library(tidyverse)
+library(skimr)
+library(janitor)
+```
+
+
+# Description
+```{r}
+skimr::skim(coffee)
+```
+
+Observe the results of the `skimr` in combination with the dictionary given on the Tidy Tuesday website. The unit of observation is what? I think it's one type of coffee, or one brand of coffee. Is there a difference? Do most farms produce only one type of coffee? In any case, they can be rated, and that's what's been done. To get an ID variable, you would use either farm_name, ico_number, or company. It's unclear. Let's refer back to the `skimr` results. There are 1,339 observations, but none of the variables has 1,339 unique observations, so there is no clear ID variable. In Stata I would use the `isid` function, but I don't have that option here. 
+
+So, presumably, some combination of variables will yield a proper ID. ICO number has 847 unique values, and farm name has 571. Producer has 691. Grading date and expiration have almost the same number of unique values as farm name, so that's a good lead. 
+
+According to the source, "these data contain reviews of 1,312 arabica and 28 robusta coffee beans from the Coffee Quality Institute's trained reviewers." And the farm metadata consists of the following variables: 
+
+- Owner
+- Country of origin
+- Farm name
+- Lot number
+- Mill
+- Company
+- Altitude
+- Region
+
+So, some combination of those will maybe yield an ID. 
+
+Looking through the data by hand, I do not see any likelihood of an ID variable unless I arbitrarily create one. The first two observations are identical in nearly everything, the only differences being variety, the scores, and category two defects. Otherwise, the columns are exactly identical. This leads me to believe that the coffe was either (a) a standard and a variety, or (b) the same coffee tested twice in the same day by two different testers. I hope the second is the case, because the first would make my life a little more difficult.
+
+It's a little annoying because the description says the data is on different beans. These beans are difficult to distinguish if you ask me. 
+
+
+Okay, let's define a new unit of observation, then. The old unit (the current one) is the unit of review, which can include multiple reviews of the same coffee, even the same batch on the same day. Instead, I can summarize to the company, region (interesting perhaps), mill, farm, or owner. I think I will look briefly at which regions score the highest in which categories. 
+
+# Which regions score highest? 
+In wine, year and location matter, so in this section I will summarize by region and harvest_year. The possible criteria are: 
+
+- aroma
+- flavor
+- aftertaste
+- acidity
+- body
+- balance
+- uniformity
+- clean cup (`clean_cup`)
+- sweetness
+- cupper points (`cupper_points`)
+- moisture
+- total cup points (`total_cup_points`)
+
+Except where mentioned, the name mentioned above is the same as the variable name in the dataset. 
+
+```{r}
+coffee_region <- coffee %>% 
+  group_by(harvest_year, region) %>% 
+  summarize(
+    total_cup_points = mean(total_cup_points, na.rm = TRUE),
+    cupper_points = mean(cupper_points, na.rm = TRUE),
+    clean_cup = mean(clean_cup, na.rm = TRUE),
+    aroma = mean(aroma, na.rm = TRUE),
+    flavor = mean(flavor, na.rm = TRUE),
+    aftertaste = mean(aftertaste, na.rm = TRUE),
+    acidity = mean(acidity, na.rm = TRUE),
+    body = mean(body, na.rm = TRUE),
+    balance = mean(balance, na.rm = TRUE),
+    sweetness = mean(sweetness, na.rm = TRUE),
+    moisture = mean(moisture, na.rm = TRUE)
+  )
+
+```
+
+
+# Back to cleaning
+The batch year variable looks very bad. Lots to clean there. 47 unique values.
+
+```{r}
+coffee %>% 
+  tabyl(harvest_year)
+```
+
+Some forms jump out: 
+
+- #t/yyyy ('t' may or may not be capitalized)
+- month yyyy - month yyyy (some variations with spacing)
+- yyyy / yyyy
+- yyyy
+
+These ones are definitely salvagable. The others occasionally are, and sometimes there is no hope because there is no year listed. Nearly all years are formatted with one of the last two options, so I will aim primarily for those. 
+
+```{r}
+library(stringr)
+years <- pull(coffee, harvest_year)
+
+plain_year <- stringr::str_extract(years, pattern = "^20\\d\\d$")
+
+slash_year <- stringr::str_extract(years, pattern = "^20\\d\\d(\\s)?/(\\s)?20\\d\\d$")
+```
+
+That captured everything I hoped it would. It doesn't solve the problem of course. For convenience, I might ignore the problem and take any observations that begin with a 20 followed by two digits. Let's compare. 
+
+```{r}
+old_method <- c(plain_year[!is.na(plain_year)], slash_year[!is.na(slash_year)])
+
+new_method <- stringr::str_extract(years, pattern = "^20\\d\\d")
+new_method <- new_method[!is.na(new_method)]  
+# Extract 20## from strings that begin with 20##.
+
+# New method caught 10 more observations, all convertible to dates
+```
+
+So, as you can see by the observation count, the new_method actually works a little better by being less strict about what it allows. It allows hypens, for example, but only takes the year. Of course, some years will be off because they show only half the story, but what can I do? The only thing would be to split the variable into a first and second year. Too much for me. Let's convert this to a date and put it in. 
+
+```{r}
+coffee <- coffee %>% 
+  mutate(
+    year = stringr::str_extract(years, pattern = "^20\\d\\d"),
+    year = as.factor(year)
+  )
+```
+
+
+So, that should take care of that I suppose. 
+
+# Back to summaries
+
+Okay, back to the summary of before. 
+
+```{r}
+coffee_region <- coffee %>% 
+  group_by(year, region) %>% 
+  summarize(
+    total_cup_points = mean(total_cup_points, na.rm = TRUE),
+    cupper_points = mean(cupper_points, na.rm = TRUE),
+    clean_cup = mean(clean_cup, na.rm = TRUE),
+    aroma = mean(aroma, na.rm = TRUE),
+    flavor = mean(flavor, na.rm = TRUE),
+    aftertaste = mean(aftertaste, na.rm = TRUE),
+    acidity = mean(acidity, na.rm = TRUE),
+    body = mean(body, na.rm = TRUE),
+    balance = mean(balance, na.rm = TRUE),
+    sweetness = mean(sweetness, na.rm = TRUE),
+    moisture = mean(moisture, na.rm = TRUE)
+  )
+```
+
+I imagine a line graph would represent this okay. Here's a line graph of every quality over time, each line representing a region and each facet a quality. 
+
+```{r}
+coffee_region %>%
+  pivot_longer(cols = cupper_points:moisture,
+               names_to = "quality",
+               values_to = "value") %>% 
+  ggplot() + 
+  geom_line(aes(x = year, y = value, group = region)) + 
+  facet_wrap(vars(quality))
+```
+
+Not much to look at here. The greatest variation occurs in clean cup, sweetness, and cupper points, although those might be attributable only to population. Clean cup and sweetness in particular look light. Moisture is on another scale. I would expect the most variation to occur in taste (acidity, aroma, flavor, sweetness), but this is an uneducated guess. I would have to do some reading to properly expect something. 
+
+Let's do the same analysis with country, although it might not mean as much. 
+
+```{r}
+coffee_country <- coffee %>% 
+  group_by(year, country_of_origin) %>% 
+  summarize(
+    total_cup_points = mean(total_cup_points, na.rm = TRUE),
+    cupper_points = mean(cupper_points, na.rm = TRUE),
+    clean_cup = mean(clean_cup, na.rm = TRUE),
+    aroma = mean(aroma, na.rm = TRUE),
+    flavor = mean(flavor, na.rm = TRUE),
+    aftertaste = mean(aftertaste, na.rm = TRUE),
+    acidity = mean(acidity, na.rm = TRUE),
+    body = mean(body, na.rm = TRUE),
+    balance = mean(balance, na.rm = TRUE),
+    sweetness = mean(sweetness, na.rm = TRUE),
+    moisture = mean(moisture, na.rm = TRUE)
+  )
+
+coffee_country %>% 
+  pivot_longer(cols = cupper_points:moisture,
+               names_to = "quality",
+               values_to = "value") %>% 
+  ggplot() + 
+  geom_line(aes(x = year, y = value, group = country_of_origin)) + 
+  facet_wrap(vars(quality))
+```
+
+Again, we see a pattern of high variation in clean cup (what is this?) and sweetness. Even with more observations, it's unlikely sweetness would iron itself out much more. Let's look closer. 
+
+```{r}
+coffee_region %>% 
+  ggplot() + 
+  geom_line(aes(x = year, y = sweetness, group = region))
+
+```
+
+```{r}
+coffee_region %>%
+  ungroup() %>% 
+  filter(sweetness == min(sweetness, na.rm = TRUE))
+```
+
+So, Nuevo Oriente had a bad year in 2012. They turned it around to an almost perfect 10 in 2015, though. Let's graph Nuevo Oriente (which, by the way, is in central Colombia). 
+
+```{r}
+coffee_region %>% 
+  filter(region == "nuevo oriente") %>% 
+  pivot_longer(cols = cupper_points:moisture,
+               names_to = "quality",
+               values_to = "value") %>% 
+  ggplot() + 
+  geom_line(aes(x = year, y = value, group = quality)) 
+```
+
+There's a lot to explore with this geographic interpretation. You could look at latitudes and longitudes and the sweetness and whether there's an association with, say, southernness. You could also connect that to weather records to figure out whether weather (say temperature) has an impact on the taste of the coffee. This would involve some serious web scraping and data manipulation that would set me back at least a week if not more. And that's if I figure out a way to get the coordinates of every single (or most) farm, no small task I would guess. 

@@ -1,0 +1,258 @@
+---
+title: "Hotel business"
+output: html_notebook
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(lubridate)
+```
+
+# Data description
+The full description and specification of this data can be found in "Hotel booking demand datasets," by Nuno Antonio, Ana de Almeida, and Luis Nunes. Abstract: 
+
+> This data article describes two datasets with hotel demand data.
+One of the hotels (H1) is a resort hotel and the other is a city hotel
+(H2). Both datasets share the same structure, with 31 variables
+describing the 40,060 observations of H1 and 79,330 observations
+of H2. Each observation represents a hotel booking. Both datasets
+comprehend bookings due to arrive between the 1st of July of 2015
+and the 31st of August 2017, including bookings that effectively
+arrived and bookings that were canceled. Since this is hotel real
+data, all data elements pertaining hotel or costumer identiﬁcation
+were deleted. Due to the scarcity of real business data for scientiﬁc
+and educational purposes, these datasets can have an important
+role for research and education in revenue management, machine
+learning, or data mining, as well as in other ﬁelds.
+
+The data is open access. The data was cleaned for Tidy Tuesday and is available on the [TidyTuesday](https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-02-11/readme.md) github page for this week. This page includes the cleaning script used to generate the data I am using. 
+
+Some key facts: 
+
+- Both hotels are in Portugal
+- The data was acquired through the hotels' property management system (PMS) databases. 
+- Some variables were engineered from other variables from different database tables.
+- The data point time for each observation was defined as the day prior to each booking's arrival. 
+- Hotel H1 is from the resort region fo Algarve
+- Hotel H2 is at the city of Lisbon
+
+Some suggested uses: 
+- Perform research in: booking cancellation prediction, customer segmentation, customer satiation, seasonality, etc.
+- Machine learning applications such as segmentation and classification problems. 
+
+The data is minimally cleaned by the Tidy folks. Names are the biggest change. 
+
+# A First Look
+Let's get the data. 
+
+```{r}
+hotels <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-02-11/hotels.csv')
+
+save(hotels, file = 'data/hotels.RData')
+```
+
+
+We can look at the data with the `skimr` package. 
+
+```{r}
+library(skimr)
+skimr::skim(hotels)
+```
+
+I'll leave this here for reference. The unit of observation is a hotel booking, but I don't have an ID variable besides row number. What variables would define one? `hotel` and `reservation_status_date` are inadequate, but the data does break along this line at least. After this, you need to simply trust that each observation is a different booking. Maybe I should make a variable to distinguish the identical bookings for each reservation date.
+
+For visualization I might want to summarize this data along some variable. For this, I will probably use hotel, booking date, plus a variable of interest (company, customer_type, is_repeated_guest, etc.).
+
+# Ideas
+What's my question? The data lends itself to cancellations, and these are easy to burn through without much data rearranging. I'll start by answering "who cancels the most?" for several demographics: 
+
+- Customer type
+- Repeated guests (note: only 3% of guests are repeated guests; data will be sporadic)
+- Distribution channel (do bookings through travel agents cancel less often? Does this earn them a discount?)
+- Lead time
+- Required car parking spaces. (Proxy for something? Maybe only for group size. Probably trash.)
+- Total of special requests
+- Deposit type (viz. whether a deposit was made)
+- Country
+- Number of children
+- Season, month, day of the week of arrival
+
+Time-variant factors
+- Year
+
+The dependent variable is `is_cancelled`. 
+
+# Tables
+Since the outcome variable is binary, these questions lend themselves to tables more than graphics. If I see an interesting trend, maybe a more complex graphic will follow. For the tables, I'm going to use the `janitor` package's function `tabyl`. 
+
+
+### Customer type
+There are four categories of customer (quoted from paper): 
+
+1. Contract: when the booking has an allotment or other type of contract associated to it.
+2. Group: When the booking is associated to a group.
+3. Transient: When the booking is not part of a group or contract, and is not associated to other transient booking. 
+4. Transient-party: When the booking is transient, but is associated to at least other transient booking. 
+
+```{r}
+library(janitor)
+
+hotels %>% 
+  tabyl(customer_type)
+```
+
+Most bookings are transient. Group bookings are very rare, but transient parties are very common. If I include all transient-party observations, will I be (at least) double-counting? I have no way of knowing, so I will include all observations. 
+
+```{r}
+hotels %>% 
+  tabyl(customer_type, is_canceled) %>% 
+  adorn_percentages('row') %>% 
+  adorn_pct_formatting()
+```
+
+Let me write a quick function for using `tabyl` in this manner. 
+
+```{r}
+p <- function(tabyl) {
+  tabyl %>% 
+    adorn_percentages('row') %>% 
+    adorn_pct_formatting()
+}
+
+hotels %>% 
+  tabyl(customer_type, is_canceled) %>% 
+  p()
+```
+
+Great. So, groups have the lowest cancellation rate while transients have the highest. Transient-party types have the lowest, and this is less likely to be spurious because it has a larger population.
+
+
+
+### Repeated guests
+Has the guest stayed at that hotel before? There is no indication of how long ago they might've stayed at the hotel, so this may or may not be reliable. 
+
+```{r}
+hotels %>% 
+  tabyl(is_repeated_guest) %>% 
+  adorn_pct_formatting()
+```
+
+As I said above, most guests are not repeat guests. 
+
+```{r}
+hotels %>% 
+  tabyl(is_repeated_guest, is_canceled) %>% 
+  p()
+```
+
+A weakness of `tabyl`s is that they have very poor labelling. Anyway, repeated guests are in fact much less likely to cancel. 
+
+
+### Distribution channel and dates observed
+The possible options are "TA" for travel agent, or "TO" for tour operator. What about those who don't belong in either? 
+
+```{r}
+hotels %>% 
+  tabyl(distribution_channel) %>% 
+  adorn_pct_formatting()
+```
+
+An unusual number of guests book through travel agents or tour operators. I wonder if websites count as travel agents. Direct is probably booking directly with the hotel, I guess by their website or by calling ahead. Corporate is obvious enough; GDS is nonsense to me, but it's a very small part of the population. If TA/TO includes websites, you might see their popularity increase over time. Let me try to look at that. 
+
+
+First, a look at the dates. There are three years observed (2015-2017), and most of the data comes from the middle year, 2016. 
+```{r}
+hotels %>% 
+  tabyl(arrival_date_year)
+```
+
+It turns out, this is because there are several months with no observations in 2015 and 2017. It will be difficult to learn much about the seasonality of the data when I only have one full year. 
+```{r}
+hotels %>% 
+  tabyl(arrival_date_month, arrival_date_year)
+```
+
+It still might be possible to look at the changes in channel over time, but the picture will be somewhat incomplete. What if some months have higher rates of booking directly? I will compare similar months across the years. Amazingly, there are only two months observed in all three years: August and July. Fortunately, every month is observed in at least two years. 
+
+```{r}
+hotels %>% 
+  tabyl(arrival_date_month, arrival_date_year, hotel)
+```
+The hotels are always observed in the same months. I don't know how to fix the alphabetical sorting, it shouldn't do that, but the months might be character vectors so then it would make sense. I'm not worrying about it. 
+
+Coming back to the question at hand, let's look at monthly trends in the ratio of distribution channel options over time. 
+```{r}
+hotels_month_dist <- hotels %>% 
+  mutate(
+    month_date = glue::glue("{arrival_date_month}_{arrival_date_year}"),
+    month_date = parse_date(month_date, format = "%B_%Y")
+  ) %>% 
+  group_by(month_date, distribution_channel) %>% 
+  summarize(n = n()) %>% 
+  group_by(month_date) %>% 
+  mutate(
+    n_sum = sum(n, na.rm = TRUE),
+    n_pct = n / n_sum
+  )
+
+hotels_month_dist %>% 
+  ggplot() + 
+  geom_area(
+    aes(x = month_date, y = n_pct, 
+        group = distribution_channel,
+        fill = distribution_channel)
+  ) + 
+  scale_fill_brewer() + 
+  theme_minimal()
+```
+
+It seems this is more or less random. I don't know what big corporate function happened in late 2015. Anyway, let's get back to the question at hand: is your distribution channel related to your cancellation? The answer seems to be yes. Corporate and direct channels have the best records (cancellation rates of 22% and 19%, respectively), and the TA/TO channel has the worst, with a 41% cancellation rate. 
+
+```{r}
+hotels %>% 
+  tabyl(distribution_channel, is_canceled) %>% 
+  p()
+```
+
+
+
+### Lead time
+There are too many scenarios under which one books a hotel to think that lead time is a good indicator for cancellation, but let's look at it anyway. Lead time is the "number of days that elapsed between the entering date of the booking into the PMS and the arrival date," (Antonio, et al. 2019). 
+
+The average booker makes the reservation around 70 days out, with some booking as many as 2 years in advance. 
+```{r}
+summary(hotels$lead_time)
+```
+
+How does this break down by reservation type? There is substantial heterogeneity between different groups. Transient bookers fall in the middle, with contracts being made the furthest in advance and 'groups' being made less than two weeks away on average. This might not be accurate, as group bookings are very uncommon. 
+```{r}
+hotels %>% 
+  group_by(customer_type) %>% 
+  summarize(median_lead = median(lead_time, na.rm = TRUE))
+```
+
+Be aware that transients have shorter lead times on average and are more likely to cancel. With that in mind, let's see if a higher lead time is correlated with a higher cancellation rate. We can look at a simple correlation with the `corrr` package. 
+
+```{r}
+library(corrr)
+
+cor(x = hotels$lead_time, y = hotels$is_canceled)
+```
+
+The direction seems to be positive, but let's look at a graphic to get a better picture. 
+```{r}
+hotels %>% 
+  ggplot() + 
+  geom_point(aes(x = lead_time, y = is_canceled),
+             position = 'jitter', alpha = 0.1,
+             shape = 20
+             ) + 
+  theme_minimal()
+```
+
+One way to interpret this is that as lead time increases, your likelihood of cancelling increases. But this graphic is messy, unclear. 
+
+
+### Total parking spaces requested
+
+
