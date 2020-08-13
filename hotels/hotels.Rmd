@@ -6,6 +6,8 @@ output: html_notebook
 ```{r, include=FALSE}
 library(tidyverse)
 library(lubridate)
+library(skimr)
+library(janitor)
 ```
 
 # Data description
@@ -55,7 +57,6 @@ save(hotels, file = 'data/hotels.RData')
 We can look at the data with the `skimr` package. 
 
 ```{r}
-library(skimr)
 skimr::skim(hotels)
 ```
 
@@ -80,7 +81,18 @@ What's my question? The data lends itself to cancellations, and these are easy t
 Time-variant factors
 - Year
 
-The dependent variable is `is_cancelled`. 
+The dependent variable is `is_canceled`. 
+
+An important variable will be arrival date, which is currently scattered across several variables. Let me bring them together. 
+
+```{r}
+hotels <- hotels %>% 
+  mutate(
+    arrival_date = glue::glue("{arrival_date_day_of_month}_{arrival_date_month}_{arrival_date_year}"),
+    arrival_date = parse_date(arrival_date, format = "%d_%B_%Y")
+  )
+```
+
 
 # Tables
 Since the outcome variable is binary, these questions lend themselves to tables more than graphics. If I see an interesting trend, maybe a more complex graphic will follow. For the tables, I'm going to use the `janitor` package's function `tabyl`. 
@@ -95,8 +107,6 @@ There are four categories of customer (quoted from paper):
 4. Transient-party: When the booking is transient, but is associated to at least other transient booking. 
 
 ```{r}
-library(janitor)
-
 hotels %>% 
   tabyl(customer_type)
 ```
@@ -145,7 +155,7 @@ hotels %>%
   p()
 ```
 
-A weakness of `tabyl`s is that they have very poor labelling. Anyway, repeated guests are in fact much less likely to cancel. 
+A weakness of `tabyl`s is that they have very poor labeling. Anyway, repeated guests are in fact much less likely to cancel. 
 
 
 ### Distribution channel and dates observed
@@ -184,8 +194,8 @@ Coming back to the question at hand, let's look at monthly trends in the ratio o
 ```{r}
 hotels_month_dist <- hotels %>% 
   mutate(
-    month_date = glue::glue("{arrival_date_month}_{arrival_date_year}"),
-    month_date = parse_date(month_date, format = "%B_%Y")
+    month = glue::glue("{arrival_date_month}_{arrival_date_year}"),
+    month = parse_date(month_date, format = "%B_%Y")
   ) %>% 
   group_by(month_date, distribution_channel) %>% 
   summarize(n = n()) %>% 
@@ -214,10 +224,34 @@ hotels %>%
   p()
 ```
 
+There is another variable, `market_segment`, which might be more useful for analysis. 
+
+```{r}
+hotels %>% 
+  tabyl(market_segment) %>% 
+  adorn_pct_formatting()
+```
+
+This confirms that online travel agents make almost half of all bookings. The variables `market_segment` and `distribution_channel` are not always comparable. 
+
+```{r}
+hotels %>% 
+  tabyl(market_segment, distribution_channel)
+```
+
+Regardless, let's look at the cancellations of each `market_segment` type. 
+
+```{r}
+hotels %>% 
+  tabyl(market_segment, is_canceled) %>% 
+  p()
+```
+
+
 
 
 ### Lead time
-There are too many scenarios under which one books a hotel to think that lead time is a good indicator for cancellation, but let's look at it anyway. Lead time is the "number of days that elapsed between the entering date of the booking into the PMS and the arrival date," (Antonio, et al. 2019). 
+Lead time is the "number of days that elapsed between the entering date of the booking into the PMS and the arrival date," (Antonio, et al. 2019). 
 
 The average booker makes the reservation around 70 days out, with some booking as many as 2 years in advance. 
 ```{r}
@@ -231,28 +265,514 @@ hotels %>%
   summarize(median_lead = median(lead_time, na.rm = TRUE))
 ```
 
-Be aware that transients have shorter lead times on average and are more likely to cancel. With that in mind, let's see if a higher lead time is correlated with a higher cancellation rate. We can look at a simple correlation with the `corrr` package. 
+Be aware that transients have shorter lead times on average and are more likely to cancel. With that in mind, let's see if a higher lead time is correlated with a higher cancellation rate. We can look at a simple correlation. 
 
 ```{r}
-library(corrr)
-
 cor(x = hotels$lead_time, y = hotels$is_canceled)
 ```
 
-The direction seems to be positive, but let's look at a graphic to get a better picture. 
+The direction seems to be positive. Let's look at a graphic. I can get an accurate picture if I summarize by `lead_time`, but the result is noisy.
 ```{r}
 hotels %>% 
+  group_by(lead_time) %>% 
+  summarize(cancel_rate = mean(is_canceled, na.rm = TRUE)) %>% 
   ggplot() + 
-  geom_point(aes(x = lead_time, y = is_canceled),
-             position = 'jitter', alpha = 0.1,
-             shape = 20
-             ) + 
-  theme_minimal()
+  geom_line(aes(x = lead_time, y = cancel_rate))
+```
+Instead, I will bucket and restrict the data to lead times of up to one year. The upward trend is clear: as lead time increases, the likelihood of canceling increases. This makes a lot of sense. If you book a trip a week away, what are the odds you won't be able to make it? Slim. If you book a trip a year away, what are the odds you forget about it, or something comes up that you can't avoid, or the money just isn't there anymore? People have a weak ability to anticipate future events and situations farther out than a few weeks. 
+
+```{r}
+hotels %>% 
+  filter(lead_time <= 365) %>% 
+  mutate(
+    lead_bin = cut(lead_time, breaks = seq(0,370, 10), labels = as.character(seq(5,365,10))),
+    lead_bin = forcats::fct_explicit_na(lead_bin)
+  ) %>% 
+  group_by(lead_bin) %>% 
+  summarize(cancel_rate = mean(is_canceled, na.rm = TRUE)) %>% 
+  filter(lead_bin != "(Missing)") %>% 
+  ggplot() + 
+  geom_point(aes(x = lead_bin, y = cancel_rate)) + 
+  geom_line(aes(x = as.numeric(lead_bin), y = cancel_rate))
+```
+This graphic might be worth publishing. It seems to respond to people who say that you get the best prices when you book further in advance. This question is actually pretty complicated. Consider the optimization problem facing the hotel owners. Some important factors: 
+
+1. Time-value of money (applies to those who put down a deposit)
+2. Likelihood that the individual/group will cancel
+3. Likelihood that another individual/group will book in place of the lost booking
+
+To know more about point three, you need to know _how long it takes you to cancel_. If I make a reservation a year in advance, I've got around a 60-70% chance of canceling. When will I do it? Will there be enough time for another booking to take the lost one's place? Do most people wait until the last second to cancel, even when they booked a year in advance? In fact, the data is included in this dataset. There are two types of date variables: `arrival_date` variables and the variable `reservation_status_date`. From these I can derive the cancellation lead time. 
+
+```{r}
+hotels <- hotels %>% 
+  mutate(
+    cancel_lead_time = case_when(
+      is_canceled == 1 ~ arrival_date - reservation_status_date,
+      is_canceled == 0 ~ 0
+    )
+    )
 ```
 
-One way to interpret this is that as lead time increases, your likelihood of cancelling increases. But this graphic is messy, unclear. 
+Note: `reservation_status_date` is the date of last update. This means that if you check out after your arrival date, `reservation_status_date` will list your checkout date. Hence, the conditional in the above definition. 
 
+Let's look at how cancellation lead time and lead time vary with each other. 
+
+```{r}
+hotels %>% 
+  filter(lead_time <= 365, cancel_lead_time > 0) %>% 
+  ggplot() + 
+  geom_point(aes(x = lead_time, y = cancel_lead_time),
+                 alpha = 0.01, shape = 20)
+```
+
+The line of slope = 1 is fairly strong, meaning many people cancel the same day they book. But this decreases as the lead-time increases. That's partially because there are fewer observations as lead-time increases, though. This graphic is showing two things at once, which isn't as effective as it could be. Instead, I would like a new way of seeing how lead time and cancellation lead time are related. For this, let me look average cancellation lead times for each lead time. 
+
+```{r}
+hotels %>% 
+  filter(lead_time <= 365, cancel_lead_time > 0) %>% 
+  mutate(
+    lead_bin = cut(lead_time, breaks = seq(0,370, 10), labels = as.character(seq(5,365,10))),
+    lead_bin = forcats::fct_explicit_na(lead_bin)
+  ) %>% 
+  group_by(lead_bin) %>% 
+  summarize(mean_cancel_lead = mean(cancel_lead_time, na.rm = TRUE)) %>% 
+  ggplot() + 
+  geom_point(aes(x = lead_bin, y = mean_cancel_lead)) + 
+  geom_line(aes(x = as.numeric(lead_bin), y = mean_cancel_lead))
+```
+
+No great changes beyond the expected variation. What about plotting the cancellation lead time as a fraction of the lead time? 
+
+```{r}
+hotels %>% 
+  filter(lead_time <= 365, cancel_lead_time > 0) %>% 
+  mutate(
+    cancel_lead_time_frac = (lead_time - cancel_lead_time) / lead_time,
+    lead_bin = cut(lead_time, breaks = seq(0,370, 10), labels = as.character(seq(5,365,10))),
+    lead_bin = forcats::fct_explicit_na(lead_bin)
+  ) %>% 
+  group_by(lead_bin) %>% 
+  summarize(mean_cancel_lead_frac = mean(cancel_lead_time_frac, na.rm = TRUE)) %>% 
+  ggplot() + 
+  geom_point(aes(x = lead_bin, y = mean_cancel_lead_frac)) + 
+  geom_line(aes(x = as.numeric(lead_bin), y = mean_cancel_lead_frac))
+```
+
+Generally, those who book further in advance give earlier notice that they are canceling. This is more try when you get close to 365 days in advance. 
 
 ### Total parking spaces requested
+I chose this variable because there seem to be specialized cases when you need extra parking spaces, but I haven't yet thought of them all. Groups, you would imagine, request many parking spaces. 
 
+```{r}
+hotels %>% 
+  tabyl(required_car_parking_spaces, customer_type) %>% 
+  adorn_percentages('col') %>% 
+  adorn_pct_formatting()
+```
+
+It is interesting to note that the vast majority of bookers do not require a parking space. I wonder what causes someone to request one? 
+
+
+### Total of special requests
+A customer will make a special request when they want a high floor, a twin bed, etc. This variable, `total_of_special_requests`, records the number of special requests made. 59% made no requests, so a fair number of people made one or more requests. 
+
+```{r}
+hotels %>% 
+  tabyl(total_of_special_requests) %>% 
+  adorn_pct_formatting()
+```
+
+How do cancellation rates vary with the number of special requests? In general, the number of special requests you make is inversely related to the likelihood that you cancel: more requests, a smaller chance that you will cancel. It's unclear why this would be the case. Maybe you care more about your booking when you make a special request, so you're more likely to follow-through. Certainly, no one who's apathetic about their booking is going to make a lot of special requests about it. 
+
+```{r}
+hotels %>% 
+  tabyl(total_of_special_requests, is_canceled) %>% 
+  p()
+```
+
+
+### Deposit type
+This is a classic tool for incentivizing bookers to follow-through. There are three types of deposit: 
+
+- No deposit
+- Non-refund
+- Refundable
+
+These aren't so intuitive. 'No deposit' is what is says, but the definitions of 'non-refund' and 'refundable' are indirect. A deposit is marked as 'non-refund' if the deposit was equal to or greater than the cost of the stay. A deposit is marked as 'refund' if it is less than the cost of the stay. In almost all cases values are either 'No deposit' or 'Non-refund'. Most bookers don't have deposits. I suspect a certain type of customer (probably booked through agency or company) would be required to make a deposit. 
+
+```{r}
+hotels %>% 
+  tabyl(deposit_type) %>% 
+  adorn_pct_formatting()
+```
+
+Before I delve into this variable too deeply, let me look at cancellation rates. Deposits are an extremely ineffective tool for preventing cancellations: 99.4% of those who paid a non-refundable deposit canceled. This is so impressive that I'm skeptical it could be true. Perhaps, if someone pays in full ahead of time, it doesn't matter whether they show up or not -- they are simply listed as canceled. Some forensic work would need to be done to figure out why this is the case, and I don't care enough.  
+
+```{r}
+hotels %>% 
+  tabyl(deposit_type, is_canceled) %>% 
+  p()
+```
+
+I'm going to do some quick cross-sections to see who has which type of deposit. 
+
+```{r}
+hotels %>% 
+  tabyl(deposit_type, customer_type) %>% 
+  adorn_percentages('col') %>% 
+  adorn_pct_formatting()
+```
+The only sure pattern here is that groups do not put down full deposits. 
+
+
+```{r}
+hotels %>% 
+  tabyl(deposit_type, market_segment) %>% 
+  adorn_percentages('col') %>% 
+  adorn_pct_formatting()
+```
+This provides an interesting look at the booking process. Of course, there would normally be someone I could ask about this to confirm what I'm trying to deduce. Anyway, market segments that do not put down deposits include: aviation (through an airline?), complementary, direct bookings, and online travel agents. Market segments that frequently put down deposits include: corporate bookings, groups (this contradicts the above table), and offline travel agents/organizations. 
+
+The quality of the variables `market_segment`, `customer_type`, and `distribution_channel` is unclear. How do they relate to each other? How are they defined and entered? 
+
+### Country
+Some countries might tend to be flighty -- let's find out. There are many countries, so I will limit my analysis to the 20 most frequent visitors. This retains around 93% of the observations while eliminating most of the countries in the list. 
+
+```{r}
+country_list <- hotels %>% 
+  group_by(country) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  head(n = 20) %>% 
+  pull(country)
+
+h_countries <- hotels %>% 
+  filter(country %in% country_list)
+```
+
+
+Which countries cancel the most? First place is Portugal, which makes sense: if you aren't traveling, you are more comfortable canceling a reservation. But this idea falls apart with the next few countries: China, Russia, Brazil, Italy. But it could be noted that Portugal's cancellation rate is 10 percentage points higher than that of the runner up, China. 
+
+```{r}
+h_countries %>% 
+  tabyl(country, is_canceled) %>% 
+  p() %>% 
+  arrange(desc(`1`))
+```
+
+On the other end of the spectrum, the foreigners most likely to show up are Germany, Austria, the Netherlands, and France. It might be interesting to plot the cancellation rate on a map. I'll table it for now. 
+
+
+### Number of Children
+More children, more spontaneous reasons you can't go on vacation anymore, right? Let's get into it. 93% of the individuals had no children; an almost equal number had either one or two (4% and 3%, respectively). Any more than two was rare. 
+
+```{r}
+hotels %>% 
+  tabyl(children) %>% 
+  adorn_pct_formatting()
+```
+How is your number of children related to your cancellation rate? The evidence is small, but it seems that having two children is a recipe for disaster. Having three children, on the other hand, makes your booking practically a guarantee. This is not where any answers are, I think. 
+
+```{r}
+hotels %>% 
+  tabyl(children, is_canceled) %>% 
+  p()
+```
+
+### Season, month, day of the week of arrival
+I'll need a summary dataset for each unit of time. 
+
+```{r}
+hotels_month <- hotels %>% 
+  mutate(
+    month = month(arrival_date)
+  ) %>% 
+  group_by(month) %>% 
+  summarize(
+    n = n(),
+    cancel_rate = mean(is_canceled, na.rm = TRUE)
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    n_sum = sum(n, na.rm = TRUE),
+    n_pct = n / n_sum
+  )
+
+hotels_season <- hotels %>% 
+  mutate(
+    month = month(arrival_date),
+    season = case_when(
+      month %in% c(1,2,12) ~ 'winter',
+      month %in% c(3,4,5) ~ 'spring',
+      month %in% c(6,7,8) ~ 'summer',
+      month %in% c(9,10,11) ~ 'fall'
+    )
+  ) %>% 
+  group_by(season) %>% 
+  summarize(
+    n = n(),
+    cancel_rate = mean(is_canceled, na.rm = TRUE)
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    n_sum = sum(n, na.rm = TRUE),
+    n_pct = n / n_sum
+  )
+
+hotels_weekday <- hotels %>% 
+  mutate(
+    weekday = lubridate::wday(arrival_date, label = TRUE, abbr = FALSE)
+  ) %>% 
+  group_by(weekday) %>% 
+  summarize(
+    n = n(),
+    cancel_rate = mean(is_canceled, na.rm = TRUE)
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    n_sum = sum(n, na.rm = TRUE),
+    n_pct = n / n_sum
+  )
+
+```
+
+
+Now I can see the results. 
+
+```{r}
+hotels_season
+hotels_month
+hotels_weekday
+```
+
+But this data lends itself well to bar charts. 
+
+```{r}
+hotels_season %>% 
+  ggplot() + 
+  geom_col(aes(x = season, y = cancel_rate))
+
+hotels_month %>% 
+  ggplot() + 
+  geom_col(aes(x = factor(month), y = cancel_rate))
+
+hotels_weekday %>% 
+  ggplot() + 
+  geom_col(aes(x = weekday, y = cancel_rate))
+```
+
+Seasonality seems to follow a pattern at all three levels. Let me talk for a minute about how this seasonality is defined. I used 'arrival date' as the date of interest. When this is the case, the summer months are marginally safer than the winter months, and more cancellations occur for bookings that start on a Thursday. 
+
+
+### Season, month, day of reservation status change
+But the day a booking starts is not the only indicator we might be interested in. Indeed, cancellations show even more seasonality when you look at the date the person either checked out or cancelled. This is based on the `reservation_status_date` variable, which is the last date a person's reservation status was changed. `reservation_status` records whether the person canceled, checked in, or checked out, and the date variable records the date on which this action occurred. Earlier, in the section "Lead time," I used `reservation_status_date` to derive the number of days before the arrival date a person canceled (cancellation lead time). For more on this variable, see that section. 
+
+So, these datasets describe the season, month, and day of the week in which the greatest share of the actions were cancellations (as opposed to check-ins or check-outs). If that sounds confusing, it's because it is. I'm keeping it here in case I forget how poor it is.
+
+
+```{r}
+hotels_month <- hotels %>% 
+  mutate(
+    month = month(reservation_status_date)
+  ) %>% 
+  group_by(month) %>% 
+  summarize(
+    n = n(),
+    cancel_rate = mean(is_canceled, na.rm = TRUE)
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    n_sum = sum(n, na.rm = TRUE),
+    n_pct = n / n_sum
+  )
+
+hotels_season <- hotels %>% 
+  mutate(
+    month = month(reservation_status_date),
+    season = case_when(
+      month %in% c(1,2,12) ~ 'winter',
+      month %in% c(3,4,5) ~ 'spring',
+      month %in% c(6,7,8) ~ 'summer',
+      month %in% c(9,10,11) ~ 'fall'
+    )
+  ) %>% 
+  group_by(season) %>% 
+  summarize(
+    n = n(),
+    cancel_rate = mean(is_canceled, na.rm = TRUE)
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    n_sum = sum(n, na.rm = TRUE),
+    n_pct = n / n_sum
+  )
+
+hotels_weekday <- hotels %>% 
+  mutate(
+    weekday = lubridate::wday(reservation_status_date, label = TRUE, abbr = FALSE)
+  ) %>% 
+  group_by(weekday) %>% 
+  summarize(
+    n = n(),
+    cancel_rate = mean(is_canceled, na.rm = TRUE)
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    n_sum = sum(n, na.rm = TRUE),
+    n_pct = n / n_sum
+  )
+
+hotels_season %>% 
+  ggplot() + 
+  geom_col(aes(x = season, y = cancel_rate))
+
+hotels_month %>% 
+  ggplot() + 
+  geom_col(aes(x = factor(month), y = cancel_rate))
+
+hotels_weekday %>% 
+  ggplot() + 
+  geom_col(aes(x = weekday, y = cancel_rate))
+```
+This is a stark contrast. Most cancellations by far occur in winter, and cancellations are fairly low in the other months. Weekends are 'safe' for cancellations, but weekdays are very high risk. This data, though, could be easily misunderstood, and I've taken some liberty with the interpretation. Properly, I should say of seasons for example that "for a given season, the odds that any given booking or cancellation was a cancellation increases in winter." What does that mean? If I consider all of the action that occurred in winter, either someone checking out or someone canceling a reservation, the majority of 'actions' were cancellations. 
+
+I should change the y-axis title to read "Ratio of checkouts to cancellations in a given season, month, or day of the week." That would show how absurd this metric is. 
+
+A more informative version looks at the distribution of cancellations across the year, and this is what I turn to now. For this, I'll need yet another set of datasets. One thing to note is that there are more observations for July and August in the whole dataset by design (see section "Distribution Channel and Dates Observed"), so I will only use data from 2016. Otherwise, the means would be unfairly biased towards months with more observations (July and August). 
+
+```{r}
+hotels_season <- hotels %>% 
+  mutate(
+    month = month(reservation_status_date),
+    season = case_when(
+      month %in% c(1,2,12) ~ 'winter',
+      month %in% c(3,4,5) ~ 'spring',
+      month %in% c(6,7,8) ~ 'summer',
+      month %in% c(9,10,11) ~ 'fall'
+    )
+  ) %>% 
+  group_by(season) %>% 
+  filter(is_canceled == 1,
+         year(reservation_status_date) == 2016) %>% 
+  summarize(
+    n = n()
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    n_sum = sum(n, na.rm = TRUE),
+    n_pct = n / n_sum,
+    test_sum = sum(n_pct)
+  )
+
+hotels_month <- hotels %>% 
+  mutate(
+    month = month(reservation_status_date)
+  ) %>% 
+  group_by(month) %>% 
+  filter(is_canceled == 1,
+         year(reservation_status_date) == 2016) %>% 
+  summarize(
+    n = n()
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    n_sum = sum(n, na.rm = TRUE),
+    n_pct = n / n_sum,
+    test_sum = sum(n_pct)
+  )
+
+
+hotels_weekday <- hotels %>% 
+  mutate(
+    weekday = lubridate::wday(reservation_status_date, label = TRUE, abbr = FALSE)
+  ) %>% 
+  group_by(weekday) %>% 
+  filter(is_canceled == 1,
+         year(reservation_status_date) == 2016) %>% 
+  summarize(
+    n = n()
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    n_sum = sum(n, na.rm = TRUE),
+    n_pct = n / n_sum,
+    test_sum = sum(n_pct)
+  )
+
+hotels_season
+hotels_month
+hotels_weekday
+
+hotels_season %>% 
+  ggplot() + 
+  geom_col(aes(x = season, y = n_pct))
+
+hotels_month %>% 
+  ggplot() + 
+  geom_col(aes(x = factor(month), y = n_pct))
+
+hotels_weekday %>% 
+  ggplot() + 
+  geom_col(aes(x = weekday, y = n_pct))
+```
+
+This is a much better description of the same idea. The question is simple: When do most cancellations occur? The answer: 
+
+- Seasonally, summer sees the fewest cancellations and winter sees the most
+- Monthly, following the seasons, January, February, March, and December see the most cancellations. August sees the fewest. 
+- Weekly, it is rare to cancel on a weekend; it is most common to cancel on a Monday, followed by a Tuesday. 
+
+Every season and month has approximately the same number of days in it, so these averages are fairly robust. Some months might have more missing days than others, though, so if you're so inclined you can make this more robust by calculating the cancellations per day and plotting that. I'm not going to right now, but maybe if I commit to learning more about this particular relationship. 
+
+
+
+## Summary
+So far, I've looked at the following variables: 
+
+- Customer type
+- Repeated guests (note: only 3% of guests are repeated guests; data will be sporadic)
+- Distribution channel (do bookings through travel agents cancel less often? Does this earn them a discount?)
+- Lead time
+- Required car parking spaces. (Proxy for something? Maybe only for group size. Probably trash.)
+- Total of special requests
+- Deposit type (viz. whether a deposit was made)
+- Country
+- Number of children
+- Season, month, day of the week of arrival
+
+For each, I looked at how it varies with cancellation rates. For some, I spent some time looking closely at the variables and how they relate to other variables in the data set. Particularly long sections were customer_type, distribution_channel and dates observed, deposit_type, country, and "Season, month, day of the week" for both arrival dates and reservation status dates. My findings can be summarized as follows: 
+
+- Customer type
+  - Transient reservations make up the majority of the reservations (74%); they are also the most likely to cancel (41% chance).
+- Repeated guests
+  - Although only 3% of guests were repeat guests, these 3% were less likely to cancel (14% chance). 
+- Distribution channel
+  - There is an unknown relationship between `distribution_channel` and `market_segment`. Most reservations were made through an online travel agent, followed by an in-person travel agent/organization.
+  - Those who booked through a travel agent were most likely to cancel (41% for TO/TA) according to `distribution_channel`. According to `market_segment`, "groups" (meaning unclear) were far more likely to cancel (61%, n = 19,811). 
+  - In this section, I found that only 2016 (the data runs from 2015-17) has a complete year's worth of data. 
+- Lead time
+  - As lead time increases, the likelihood of cancellation increases. 
+  - For those who canceled, as lead time increases, the buffer between when you cancel and when you were supposed to arrive increases (a large cancellation lead). 
+- Required car parking spaces
+  - Most customers require no parking spots. No relationship.
+- Total of special requests
+  - Those who made more special requests were less likely to cancel. No requests: 48% cancellation rate. Two requests: 22% cancellation rate. 
+- Deposit type
+  - Nearly all deposits were non-refund deposits. Non-refund deposits (12% of all bookings) always canceled; they had a cancellation rate of 99.4%. This struck me as an accounting error instead of a relationship. 
+- Country
+  - Worst countries: Portugal, china, Russia, Brazil
+  - Best countries: Germany, Austria, Netherlands, France
+- Number of children
+  - No relationship. Most people have two or fewer children. 
+- Season, month, day of the week of arrival
+  - Seasonally, summer sees the fewest cancellations and winter sees the most
+  - Monthly, following the seasons, January, February, March, and December see the most cancellations. August sees the fewest. 
+  - Weekly, it is rare to cancel on a weekend; it is most common to cancel on a Monday, followed by a Tuesday. 
+
+
+One thing you'll notice about my work so far is that I didn't distinguish between Hotel A and Hotel B (urban and resort). This was intentional, to reduce the number of cross-sections I had to work with. My work here is nearly done, but if this was an exploratory project, I would follow up on the most interesting variables by looking at their differences across the two hotel types. 
+
+
+# A Final Graphic
+What will my final graphic be? What's most interesting? Perhaps a panel of seasonality characteristics. Either that, or I will make a nicer version of the graph showing lead-time and the likelihood of canceling. The lead time graphic is too thin to make an interesting post, so I would need additional layers to make it worthwhile. 
 

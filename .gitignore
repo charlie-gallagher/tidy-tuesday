@@ -4,3 +4,4 @@
 *.jpg
 *.Rproj.*
 *.csv
+.Rproj.user
