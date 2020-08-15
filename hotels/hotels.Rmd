@@ -39,6 +39,7 @@ Some key facts:
 - Hotel H2 is at the city of Lisbon
 
 Some suggested uses: 
+
 - Perform research in: booking cancellation prediction, customer segmentation, customer satiation, seasonality, etc.
 - Machine learning applications such as segmentation and classification problems. 
 
@@ -77,8 +78,10 @@ What's my question? The data lends itself to cancellations, and these are easy t
 - Country
 - Number of children
 - Season, month, day of the week of arrival
+- Average daily rate (ADR)
 
 Time-variant factors
+
 - Year
 
 The dependent variable is `is_canceled`. 
@@ -195,11 +198,11 @@ Coming back to the question at hand, let's look at monthly trends in the ratio o
 hotels_month_dist <- hotels %>% 
   mutate(
     month = glue::glue("{arrival_date_month}_{arrival_date_year}"),
-    month = parse_date(month_date, format = "%B_%Y")
+    month = parse_date(month, format = "%B_%Y")
   ) %>% 
-  group_by(month_date, distribution_channel) %>% 
+  group_by(month, distribution_channel) %>% 
   summarize(n = n()) %>% 
-  group_by(month_date) %>% 
+  group_by(month) %>% 
   mutate(
     n_sum = sum(n, na.rm = TRUE),
     n_pct = n / n_sum
@@ -208,7 +211,7 @@ hotels_month_dist <- hotels %>%
 hotels_month_dist %>% 
   ggplot() + 
   geom_area(
-    aes(x = month_date, y = n_pct, 
+    aes(x = month, y = n_pct, 
         group = distribution_channel,
         fill = distribution_channel)
   ) + 
@@ -725,6 +728,66 @@ This is a much better description of the same idea. The question is simple: When
 Every season and month has approximately the same number of days in it, so these averages are fairly robust. Some months might have more missing days than others, though, so if you're so inclined you can make this more robust by calculating the cancellations per day and plotting that. I'm not going to right now, but maybe if I commit to learning more about this particular relationship. 
 
 
+### Average Daily Rate
+There could be a relationship between the price a customer pays for a room and the likelihood that they will cancel. 
+
+```{r}
+summary(hotels$adr)
+```
+
+Some reservations are complimentary, according to `market_segment`. These are so few that I'm not worried about them. But still, let's look at the price breakdown by market segment. The most expensive rooms are booked by online travel agents, followed closely by direct bookings. Corporate bookings seem to get the best rates, as do groups. 
+
+```{r}
+hotels %>% 
+  group_by(market_segment) %>% 
+  summarize(mean_adr = mean(adr, na.rm = TRUE),
+            median_adr = median(adr, na.rm = TRUE))
+```
+
+There is some substantial heterogeneity for the different groups. Let me look at a faceted set of histograms. 
+
+```{r}
+hotels %>% 
+  filter(adr < 300,
+         !(market_segment %in% c("Complementary","Undefined"))) %>% 
+  ggplot() + 
+  geom_histogram(aes(x = adr, y = after_stat(density), group = market_segment,
+                     fill = market_segment)) + 
+  facet_wrap(vars(market_segment))
+```
+
+Nearly all complementary stays have a price of zero, so I exclude this group and the undefined group. Looking at the other groups, there are three main patterns. First, airlines are in a class of their own, for their pricing is very consistent. This is probably thanks to agreements between the airline and the hotel as well as airline policies on room quality and cost. Second, the Corporate, Offline TA/TO, and Groups market segments have similar distributions to each other; they tend to be lower and less skewed. Third, the online TA and the direct bookings have approximately the same distribution; they are both centered above 100 and are right skewed. 
+
+Nothing here is comparable as is, since many things contribute to costs (especially because there are two separate hotels, which I have deliberately ignored). 
+
+To investigate the relationship between price and cancellation behavior, the customer has to be influenced by the costs. This does not, interestingly, rule out complementary stays, but it does rule out corporation and aviation, and possibly groups. 
+
+```{r}
+hotels %>% 
+  filter(
+    adr < 400,
+    !(market_segment %in% c("Aviation", "Undefined", "Corporate"))
+  ) %>%
+  mutate(
+    adr_bin = cut(adr, breaks = seq(0,400,40)),
+    adr_bin = forcats::fct_explicit_na(adr_bin)
+  ) %>% 
+  group_by(adr_bin, market_segment) %>% 
+  summarize(
+    cancel_rate = mean(is_canceled),
+    n = n()
+    ) %>%  
+  group_by(market_segment) %>% 
+  mutate(n_sum = sum(n)) %>% 
+  filter(adr_bin != "(Missing)") %>% 
+  ggplot() + 
+  geom_line(aes(x = adr_bin, y = cancel_rate, color = market_segment,
+                group = market_segment,
+                size = n))
+```
+
+Here, line thickness represents the population of the market segment at that point. Frankly, there are no clear trends. As prices increases, it does seem like cancellations go down, but this is contradicted by an upward trend among those who book with an online travel agent (pink). 
+
 
 ## Summary
 So far, I've looked at the following variables: 
@@ -739,6 +802,7 @@ So far, I've looked at the following variables:
 - Country
 - Number of children
 - Season, month, day of the week of arrival
+- Average daily price
 
 For each, I looked at how it varies with cancellation rates. For some, I spent some time looking closely at the variables and how they relate to other variables in the data set. Particularly long sections were customer_type, distribution_channel and dates observed, deposit_type, country, and "Season, month, day of the week" for both arrival dates and reservation status dates. My findings can be summarized as follows: 
 
@@ -768,6 +832,9 @@ For each, I looked at how it varies with cancellation rates. For some, I spent s
   - Seasonally, summer sees the fewest cancellations and winter sees the most
   - Monthly, following the seasons, January, February, March, and December see the most cancellations. August sees the fewest. 
   - Weekly, it is rare to cancel on a weekend; it is most common to cancel on a Monday, followed by a Tuesday. 
+- Average daily price
+  - No clear relationship between cost of room and likelihood of canceling. 
+
 
 
 One thing you'll notice about my work so far is that I didn't distinguish between Hotel A and Hotel B (urban and resort). This was intentional, to reduce the number of cross-sections I had to work with. My work here is nearly done, but if this was an exploratory project, I would follow up on the most interesting variables by looking at their differences across the two hotel types. 
@@ -775,4 +842,10 @@ One thing you'll notice about my work so far is that I didn't distinguish betwee
 
 # A Final Graphic
 What will my final graphic be? What's most interesting? Perhaps a panel of seasonality characteristics. Either that, or I will make a nicer version of the graph showing lead-time and the likelihood of canceling. The lead time graphic is too thin to make an interesting post, so I would need additional layers to make it worthwhile. 
+
+I do like the idea of a collage, though. I would like one central graphic and several side graphics to augment the point. I'll have to play with the scale to make the numbers all the same size, not sure how I'll do that without a lot of trial and error. Actually, that could be a difficult part of this. I'll need to work on my sizes, aspect ratios, and other components of graphic publication, rather than just the information itself. 
+
+Seasonality lends itself to this type of analysis. The main graphic could be the distribution of cancellations across the year (monthly) with a sub-graphic for weekly trends and a secondary sub-panel for the seasonality of cancellations by scheduled arrival date. I'm not sure how I could integrate these, but I think it's interesting that it matters more what season/day it is right this minute than it matters when your reservation was for. 
+
+Problems include the biggest one: the data only covers a single year. It's a sample-size of one, which makes my margin of error huge. It's helped a little by the large sample size of actual observations, but if this was an abnormal year for any reason, the data has dubious value. 
 
