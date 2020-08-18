@@ -3,6 +3,15 @@ title: "Extinct Plants"
 output: html_notebook
 ---
 
+```{r, include=FALSE}
+library(tidyverse)
+library(skimr)
+library(lubridate)
+library(janitor)
+```
+
+
+
 This dataset came out August 18, 2020 (I got it a day early). The page is [here](https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-08-18/readme.md). The GitHub page also provides three links for more information: 
 
 - The [IUCN main page](https://www.iucnredlist.org/)
@@ -12,7 +21,76 @@ This dataset came out August 18, 2020 (I got it a day early). The page is [here]
 It's a little late, so I'm going to make a good round start tonight, mostly reading and doing the typical data skim with `skimr::skim()`. 
 
 # Background
+Question: What is the IUCN Red List? 
 
+> Established in 1964, The International Union for Conservation of Nature’s Red List of Threatened Species has evolved to become the world’s most comprehensive information source on the global conservation status of animal, fungi and plant species.
+The IUCN Red List is a critical indicator of the health of the world’s biodiversity. Far more than a list of species and their status, it is a powerful tool to inform and catalyze action for biodiversity conservation and policy change, critical to protecting the natural resources we need to survive. It provides information about range, population size, habitat and ecology, use and/or trade, threats, and conservation actions that will help inform necessary conservation decisions.
+
+This is from the IUCN Red List website. Also on their website is a brief tally of species threatened by extinction. 
+
+- 41% of amphibians
+- 26% of mammals
+- 34% of conifers
+- 14% of birds
+- 30% of sharks and rays
+- 33% of reef corals
+- 28% of selected crustaceans
+- 27% of all assessed species; that's more than 32,000 species threatened with extinction.
+
+The data I'm working with deals with plants, i.e. anything in the kingdom Plantae. My best guess is that most endangered species are flowering plants, but I'm not surprised that conifers have such a high rate of going extinct. There are very few species of gymnosperms compared to the flowering plants, and they often have very specific living conditions. They are usually trees, which makes them targets of deforestation. 
 
 # The Data
 The data comes from the International Union for Conservation of Nature (IUCN) Red List of Threatened Species (Version 2020-1). It was prepared by Florent Lavergne for his [infographic](https://www.behance.net/gallery/98304453/Infographic-Plants-in-Danger).
+
+## Getting the data
+```{r}
+plants <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-08-18/plants.csv')
+actions <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-08-18/actions.csv')
+threats <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-08-18/threats.csv')
+
+save(plants, actions, threats, file = "data/extinct_plants.RData")
+```
+
+The data dictionaries for these are obviously long, so I will reference them when necessary. The data is organized into three data sets. 
+
+1. `plants`: In this data set, the unit of observation is the plant. For each plant, each variable describes one of the plant's characteristics. Examples include the country of origin, the taxonomic group, indicators for whether the plant is threatened by a given threat, and indicators for whether the plant is the target of a given conservation action. 
+```{r}
+head(plants)
+```
+
+
+
+2. `actions`: The unit of observation is the action/plant combination. In other words, this is simply a fully interacted version of the `plants` data set. 
+```{r}
+head(actions)
+```
+
+3. `threats`: The unit of observation is the threat/species combination, similar to the `actions` data set. 
+```{r}
+head(threats)
+```
+
+The latter two data sets are derivable from the plants dataset, so let me look there first. 
+
+```{r}
+skimr::skim(plants)
+```
+
+There are 500 plant species from 72 countries of origin on 6 out of 7 continents. Most, I would guess, are flowering plants. There are two possible 'red list' categories: extinct and extinct in the wild. The means of the numeric variables provide a convenient way of seeing how they are distributed. For example, almost half the species are threatened by agriculture and aquaculture (AA), while only 4% were threatened by human intrusions (HID). A species may be threatened by one or more different threats. A shocking figure is that only 0.2% of the species (that's 1 out of all 500) were the target of education and awareness action. In fact, actions are few; 76% have no action to save them registered. (The NA action is, I'm guessing, exclusive of all the other actions.) 
+
+It's easier to understand the data if you know what plant groups are considered here. 
+```{r}
+plants %>% 
+  tabyl(group)
+```
+The results here are somewhat surprising. There is only one conifer listed, despite 34% of conifers being endangered. Ferns and fern allies represent the second largest category after flowering plants, which I'm happy to see. And the mosses have a good showing as well. 
+
+Okay, so I have a sense of the data now. Before I go any further, I'm going to flesh out the 'background' section using the links the Tidy team offered. 
+
+
+# Questions
+There are a million questions I want to ask about this topic, of course, but let me stay very limited. What is the leading cause of extinction? What plant families get the most attention? For that one, I'll need to match each species to its full scientific name, which could be a task given how rare some of these are. But I'm very interested in finding a database of plant names for just that purpose. 
+
+I have country of origin information, so I could plot the density by country (like [this twitter post](https://twitter.com/JDavison_/status/1295385653593743361)). I could explore a number of topics this way, but because it's on a global scale I don't think I would find it satisfying. 
+
+If I could merge in extra plant data, that would be the most satisfying, I think. Which habitats are most endangered? Why the tropics? Where were these plants last recorded in the wild? In large numbers? That might be asking a lot. I shoud perhaps limit myself at first. 

@@ -1749,6 +1749,8 @@ summary {
 
 
 <!-- rnb-text-begin -->
+<!-- rnb-text-end -->
+<!-- rnb-text-begin -->
 <p>This dataset came out August 18, 2020 (I got it a day early). The page is <a href="https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-08-18/readme.md">here</a>. The GitHub page also provides three links for more information:</p>
 <ul>
 <li>The <a href="https://www.iucnredlist.org/">IUCN main page</a></li>
@@ -1758,14 +1760,215 @@ summary {
 <p>It’s a little late, so I’m going to make a good round start tonight, mostly reading and doing the typical data skim with <code>skimr::skim()</code>.</p>
 <div id="background" class="section level1">
 <h1>Background</h1>
+<p>Question: What is the IUCN Red List?</p>
+<blockquote>
+<p>Established in 1964, The International Union for Conservation of Nature’s Red List of Threatened Species has evolved to become the world’s most comprehensive information source on the global conservation status of animal, fungi and plant species. The IUCN Red List is a critical indicator of the health of the world’s biodiversity. Far more than a list of species and their status, it is a powerful tool to inform and catalyze action for biodiversity conservation and policy change, critical to protecting the natural resources we need to survive. It provides information about range, population size, habitat and ecology, use and/or trade, threats, and conservation actions that will help inform necessary conservation decisions.</p>
+</blockquote>
+<p>This is from the IUCN Red List website. Also on their website is a brief tally of species threatened by extinction.</p>
+<ul>
+<li>41% of amphibians</li>
+<li>26% of mammals</li>
+<li>34% of conifers</li>
+<li>14% of birds</li>
+<li>30% of sharks and rays</li>
+<li>33% of reef corals</li>
+<li>28% of selected crustaceans</li>
+<li>27% of all assessed species; that’s more than 32,000 species threatened with extinction.</li>
+</ul>
+<p>The data I’m working with deals with plants, i.e. anything in the kingdom Plantae. My best guess is that most endangered species are flowering plants, but I’m not surprised that conifers have such a high rate of going extinct. There are very few species of gymnosperms compared to the flowering plants, and they often have very specific living conditions. They are usually trees, which makes them targets of deforestation.</p>
 </div>
 <div id="the-data" class="section level1">
 <h1>The Data</h1>
 <p>The data comes from the International Union for Conservation of Nature (IUCN) Red List of Threatened Species (Version 2020-1). It was prepared by Florent Lavergne for his <a href="https://www.behance.net/gallery/98304453/Infographic-Plants-in-Danger">infographic</a>.</p>
+<div id="getting-the-data" class="section level2">
+<h2>Getting the data</h2>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxucGxhbnRzIDwtIHJlYWRyOjpyZWFkX2NzdignaHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3Jmb3JkYXRhc2NpZW5jZS90aWR5dHVlc2RheS9tYXN0ZXIvZGF0YS8yMDIwLzIwMjAtMDgtMTgvcGxhbnRzLmNzdicpXG5gYGAifQ== -->
+<pre class="r"><code>plants &lt;- readr::read_csv(&#39;https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-08-18/plants.csv&#39;)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiUGFyc2VkIHdpdGggY29sdW1uIHNwZWNpZmljYXRpb246XG5jb2xzKFxuICAuZGVmYXVsdCA9IGNvbF9kb3VibGUoKSxcbiAgYmlub21pYWxfbmFtZSA9IGNvbF9jaGFyYWN0ZXIoKSxcbiAgY291bnRyeSA9IGNvbF9jaGFyYWN0ZXIoKSxcbiAgY29udGluZW50ID0gY29sX2NoYXJhY3RlcigpLFxuICBncm91cCA9IGNvbF9jaGFyYWN0ZXIoKSxcbiAgeWVhcl9sYXN0X3NlZW4gPSBjb2xfY2hhcmFjdGVyKCksXG4gIHJlZF9saXN0X2NhdGVnb3J5ID0gY29sX2NoYXJhY3RlcigpXG4pXG5TZWUgc3BlYyguLi4pIGZvciBmdWxsIGNvbHVtbiBzcGVjaWZpY2F0aW9ucy5cbiJ9 -->
+<pre><code>Parsed with column specification:
+cols(
+  .default = col_double(),
+  binomial_name = col_character(),
+  country = col_character(),
+  continent = col_character(),
+  group = col_character(),
+  year_last_seen = col_character(),
+  red_list_category = col_character()
+)
+See spec(...) for full column specifications.</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYWN0aW9ucyA8LSByZWFkcjo6cmVhZF9jc3YoJ2h0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS9yZm9yZGF0YXNjaWVuY2UvdGlkeXR1ZXNkYXkvbWFzdGVyL2RhdGEvMjAyMC8yMDIwLTA4LTE4L2FjdGlvbnMuY3N2JylcbmBgYCJ9 -->
+<pre class="r"><code>actions &lt;- readr::read_csv(&#39;https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-08-18/actions.csv&#39;)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiUGFyc2VkIHdpdGggY29sdW1uIHNwZWNpZmljYXRpb246XG5jb2xzKFxuICBiaW5vbWlhbF9uYW1lID0gY29sX2NoYXJhY3RlcigpLFxuICBjb3VudHJ5ID0gY29sX2NoYXJhY3RlcigpLFxuICBjb250aW5lbnQgPSBjb2xfY2hhcmFjdGVyKCksXG4gIGdyb3VwID0gY29sX2NoYXJhY3RlcigpLFxuICB5ZWFyX2xhc3Rfc2VlbiA9IGNvbF9jaGFyYWN0ZXIoKSxcbiAgcmVkX2xpc3RfY2F0ZWdvcnkgPSBjb2xfY2hhcmFjdGVyKCksXG4gIGFjdGlvbl90eXBlID0gY29sX2NoYXJhY3RlcigpLFxuICBhY3Rpb25fdGFrZW4gPSBjb2xfZG91YmxlKClcbilcbiJ9 -->
+<pre><code>Parsed with column specification:
+cols(
+  binomial_name = col_character(),
+  country = col_character(),
+  continent = col_character(),
+  group = col_character(),
+  year_last_seen = col_character(),
+  red_list_category = col_character(),
+  action_type = col_character(),
+  action_taken = col_double()
+)</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxudGhyZWF0cyA8LSByZWFkcjo6cmVhZF9jc3YoJ2h0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS9yZm9yZGF0YXNjaWVuY2UvdGlkeXR1ZXNkYXkvbWFzdGVyL2RhdGEvMjAyMC8yMDIwLTA4LTE4L3RocmVhdHMuY3N2JylcbmBgYCJ9 -->
+<pre class="r"><code>threats &lt;- readr::read_csv(&#39;https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-08-18/threats.csv&#39;)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiUGFyc2VkIHdpdGggY29sdW1uIHNwZWNpZmljYXRpb246XG5jb2xzKFxuICBiaW5vbWlhbF9uYW1lID0gY29sX2NoYXJhY3RlcigpLFxuICBjb3VudHJ5ID0gY29sX2NoYXJhY3RlcigpLFxuICBjb250aW5lbnQgPSBjb2xfY2hhcmFjdGVyKCksXG4gIGdyb3VwID0gY29sX2NoYXJhY3RlcigpLFxuICB5ZWFyX2xhc3Rfc2VlbiA9IGNvbF9jaGFyYWN0ZXIoKSxcbiAgcmVkX2xpc3RfY2F0ZWdvcnkgPSBjb2xfY2hhcmFjdGVyKCksXG4gIHRocmVhdF90eXBlID0gY29sX2NoYXJhY3RlcigpLFxuICB0aHJlYXRlbmVkID0gY29sX2RvdWJsZSgpXG4pXG4ifQ== -->
+<pre><code>Parsed with column specification:
+cols(
+  binomial_name = col_character(),
+  country = col_character(),
+  continent = col_character(),
+  group = col_character(),
+  year_last_seen = col_character(),
+  red_list_category = col_character(),
+  threat_type = col_character(),
+  threatened = col_double()
+)</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2F2ZShwbGFudHMsIGFjdGlvbnMsIHRocmVhdHMsIGZpbGUgPSBcImRhdGEvZXh0aW5jdF9wbGFudHMuUkRhdGFcIilcbmBgYCJ9 -->
+<pre class="r"><code>save(plants, actions, threats, file = &quot;data/extinct_plants.RData&quot;)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>The data dictionaries for these are obviously long, so I will reference them when necessary. The data is organized into three data sets.</p>
+<ol style="list-style-type: decimal">
+<li><code>plants</code>: In this data set, the unit of observation is the plant. For each plant, each variable describes one of the plant’s characteristics. Examples include the country of origin, the taxonomic group, indicators for whether the plant is threatened by a given threat, and indicators for whether the plant is the target of a given conservation action.</li>
+</ol>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-frame-begin eyJtZXRhZGF0YSI6eyJjbGFzc2VzIjpbInRibF9kZiIsInRibCIsImRhdGEuZnJhbWUiXSwibnJvdyI6NiwibmNvbCI6MjR9LCJyZGYiOiJINHNJQUFBQUFBQUFCczFXVFU4Yk1SQTFnUUJKRzZDaWxUajZCNUJvRTRyVW5Lb2xwSURVMGlnQndXM2xlRTNXaXJFanI3ZUJXMzl5enoyUWVvTzlJUzdrZzB0cmFiUDJtM2t6enhuTHMrM2o2NFBpZFJFQXNBcldRQTZzNXZVVXJEZGExZHBoRFlDMW5GNnRhRXNoZmQ5cHIxMDkyZFBQVHVwbURCLzhicUlvRXh3T3FNS0lTazU0VEl5eDVHTkVPSUxranZZU2xERXdZdmVEQ01HUTloT1dERFdCeHNiNFBqUEtwQ3NwSi9KSFp0dkpiRVBLUWlMcEpBdVJNS0lNalZOUDY5dHNHVm5XK1pKVFJVTFlVVWdSR3puZkVMd256R0svZ3loWDhKUXdMWDBmK2pGT0Jlb05JaDdDQzBsamhUZ01FV3drUExKN2V0c1FvZy9QWXFaOUprRWp5cEVqWitNN0pvaFR5eXVkQzZraTZOL3EzV0FMcnZzM0w2NGMvcG9mVXpmRjloY21oam9lNzhHVzFxUCtCVHl0cUZEelBLOWM4MnFlQmFyMVQxNjVXcS9YSjhESEZEaTB3SnNqY2lNa2dkVzY5NFJVUzMwTzZuOERBR3lOODcwd1B2K2FmajhaQy9HZUdUTjVNL0tPZVMvcFdWYm5ESDB6ZVF1TS81SzNiUDNtNVZ2Zy8xc3EzN3p6OHRwOGkvTGNjN1owdGpubmN4N3Z0ZmxjME0zL2pJNGRNTGxmZHB0M2luS3NJT1ZRUlFSZTZmWmc3MHRqZXMzeTJiRFRiVEhQMGEzdUlvOXk5dXlsM3FWYzNGTEVndFJxWTJPUmNDWHY3ZDJGQmRmQlNYYUY1bnRTSkFPejJMb25TQVlNeFNxSUNiR3RxNkFpU1pBS2ZOOEFSUU1jdFM4ZHBOMDR0aGVwUWM0Nko4ZU9VN1AxelluY2FEZ3VwMmVXdEdtUWxrTzU2RGlVODQ0YjlhVHBBT2ZaQmhCV3VyTUdYNit5c0FhWkJMRXVya2ZiOVdqNkRwQ2xlU2RKR0REZHVBT3NtMzVQNkNwTWw3RWd4YkJpUzFuU1QrNm4vaG1OUnIvZGVtTmRGRnR2Q3haRHBGRGxScWJGQnVEQm9XeUlRYXBHazNMcDkxUGVJYTlJQjloT2VLb2tMT01vNGYxeU5VMHdOaitPa3BtdlA1bnZQYWJNalV5b3ZQMTBJTHluejVqVnpsQ1hNSHZDOUk3SEc2NE1kTnUyaDdDbzBiaWloRUxXcjRnRnM4aDRiK0RoRC9qUWVWazNDZ0FBIn0= -->
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["binomial_name"],"name":[1],"type":["chr"],"align":["left"]},{"label":["country"],"name":[2],"type":["chr"],"align":["left"]},{"label":["continent"],"name":[3],"type":["chr"],"align":["left"]},{"label":["group"],"name":[4],"type":["chr"],"align":["left"]},{"label":["year_last_seen"],"name":[5],"type":["chr"],"align":["left"]},{"label":["threat_AA"],"name":[6],"type":["dbl"],"align":["right"]},{"label":["threat_BRU"],"name":[7],"type":["dbl"],"align":["right"]},{"label":["threat_RCD"],"name":[8],"type":["dbl"],"align":["right"]},{"label":["threat_ISGD"],"name":[9],"type":["dbl"],"align":["right"]},{"label":["threat_EPM"],"name":[10],"type":["dbl"],"align":["right"]},{"label":["threat_CC"],"name":[11],"type":["dbl"],"align":["right"]},{"label":["threat_HID"],"name":[12],"type":["dbl"],"align":["right"]},{"label":["threat_P"],"name":[13],"type":["dbl"],"align":["right"]},{"label":["threat_TS"],"name":[14],"type":["dbl"],"align":["right"]},{"label":["threat_NSM"],"name":[15],"type":["dbl"],"align":["right"]},{"label":["threat_GE"],"name":[16],"type":["dbl"],"align":["right"]},{"label":["threat_NA"],"name":[17],"type":["dbl"],"align":["right"]},{"label":["action_LWP"],"name":[18],"type":["dbl"],"align":["right"]},{"label":["action_SM"],"name":[19],"type":["dbl"],"align":["right"]},{"label":["action_LP"],"name":[20],"type":["dbl"],"align":["right"]},{"label":["action_RM"],"name":[21],"type":["dbl"],"align":["right"]},{"label":["action_EA"],"name":[22],"type":["dbl"],"align":["right"]},{"label":["action_NA"],"name":[23],"type":["dbl"],"align":["right"]},{"label":["red_list_category"],"name":[24],"type":["chr"],"align":["left"]}],"data":[{"1":"Abutilon pitcairnense","2":"Pitcairn","3":"Oceania","4":"Flowering Plant","5":"2000-2020","6":"0","7":"0","8":"0","9":"1","10":"0","11":"0","12":"0","13":"0","14":"0","15":"0","16":"1","17":"0","18":"1","19":"1","20":"0","21":"1","22":"0","23":"0","24":"Extinct in the Wild"},{"1":"Acaena exigua","2":"United States","3":"North America","4":"Flowering Plant","5":"1980-1999","6":"0","7":"0","8":"0","9":"1","10":"0","11":"0","12":"0","13":"0","14":"0","15":"0","16":"0","17":"0","18":"0","19":"0","20":"0","21":"1","22":"0","23":"0","24":"Extinct"},{"1":"Acalypha dikuluwensis","2":"Congo","3":"Africa","4":"Flowering Plant","5":"1940-1959","6":"0","7":"0","8":"0","9":"0","10":"1","11":"0","12":"0","13":"0","14":"0","15":"0","16":"0","17":"0","18":"0","19":"0","20":"0","21":"0","22":"0","23":"1","24":"Extinct"},{"1":"Acalypha rubrinervis","2":"Saint Helena, Ascension and Tristan da Cunha","3":"Africa","4":"Flowering Plant","5":"Before 1900","6":"1","7":"1","8":"0","9":"1","10":"0","11":"0","12":"0","13":"0","14":"0","15":"0","16":"0","17":"1","18":"0","19":"0","20":"0","21":"0","22":"0","23":"1","24":"Extinct"},{"1":"Acalypha wilderi","2":"Cook Islands","3":"Oceania","4":"Flowering Plant","5":"1920-1939","6":"1","7":"0","8":"1","9":"1","10":"0","11":"0","12":"0","13":"0","14":"1","15":"0","16":"0","17":"0","18":"0","19":"0","20":"0","21":"0","22":"0","23":"1","24":"Extinct"},{"1":"Acer hilaense","2":"China","3":"Asia","4":"Flowering Plant","5":"1920-1939","6":"0","7":"0","8":"1","9":"0","10":"0","11":"0","12":"0","13":"0","14":"0","15":"0","16":"0","17":"0","18":"0","19":"1","20":"0","21":"0","22":"0","23":"0","24":"Extinct in the Wild"}],"options":{"columns":{"min":{},"max":[10],"total":[24]},"rows":{"min":[10],"max":[10],"total":[6]},"pages":{}}}
+  </script>
+</div>
+<!-- rnb-frame-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<ol start="2" style="list-style-type: decimal">
+<li><code>actions</code>: The unit of observation is the action/plant combination. In other words, this is simply a fully interacted version of the <code>plants</code> data set.</li>
+</ol>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-frame-begin eyJtZXRhZGF0YSI6eyJjbGFzc2VzIjpbInRibF9kZiIsInRibCIsImRhdGEuZnJhbWUiXSwibnJvdyI6NiwibmNvbCI6OH0sInJkZiI6Ikg0c0lBQUFBQUFBQUJzMVV3VTdiUUJCZEFnbEpTcUF0cW5yMXFiZEVycXVlRVNyMEJHcEVWY0hObXF5bnppcWJXV3U5VnNpdG44eTVCOUxaNElYYVo2cXlrdU9kOTNaMjNwdU1mSFYyODJsNE14UkM3SW85MFJHN1hkNkszcGZweCtSeklzUmVoNk1kWmdiK2ZjdW5qbm5UNStlMVAxWVQ3MDVubFZQYVVGUW9KMEZaUWlyeDVaRk4xZjFwelQxNzNLeXovMDBpa0lMbkRKc1ZqcjVxczBLcktJK21Hc2o5RDdpcGFKREVjVHhPNGlUK04wQ3oydkg1clZNa1hhUW9jbk9NcnBYT1hnclZWUHIrQWlpTFBrVFg0TkJHVTJzY1NxZE1HS0czM3d1VUNzdm9FZ2h5WE9KanZ3OHVZTVY1VTZPVlhJY3B2OElTd2NvNUU1ZUdsRFArL3dqa2VWWko4SGN6ZTdvQ2k0UmxHZWJvQnkzSXJQeWtIbnAxSjNkaXU4STdySGI4dEJvZmhpN0JFc3ZhYXI4R1J6TkZacWxBcDU0TmhhV3B5Tm5nWUNBTmNjdWViSFp6YTZxaURnN1g3QzdWVUxxMFJBdzllbU14UzdWaWtPMWhiaDR2ZXdYYlZxWnVYWVJ5QndHQ0JlYzNSUStzV1UyQzhCRS9uVi84czlsc2ZyZmRTWllRM0FWd21JR0R5VS9yclFseDMwclpONFd2eTBrZC83M3N0cEozYkFzNHFzZ3J5Y1p5WHRGaW5QZ0NXL3BoamVwOTc2OTkvNkZrWjFOZjFhMnY2aUhsM05HZ1hjTU1kZWduTzk0YW5oUThLS0hsUTBiTGlUTU93cm1oTkRvZ1cyL2kvZzg0SjNqQkp3WUFBQT09In0= -->
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["binomial_name"],"name":[1],"type":["chr"],"align":["left"]},{"label":["country"],"name":[2],"type":["chr"],"align":["left"]},{"label":["continent"],"name":[3],"type":["chr"],"align":["left"]},{"label":["group"],"name":[4],"type":["chr"],"align":["left"]},{"label":["year_last_seen"],"name":[5],"type":["chr"],"align":["left"]},{"label":["red_list_category"],"name":[6],"type":["chr"],"align":["left"]},{"label":["action_type"],"name":[7],"type":["chr"],"align":["left"]},{"label":["action_taken"],"name":[8],"type":["dbl"],"align":["right"]}],"data":[{"1":"Abutilon pitcairnense","2":"Pitcairn","3":"Oceania","4":"Flowering Plant","5":"2000-2020","6":"Extinct in the Wild","7":"Land & Water Protection","8":"1"},{"1":"Abutilon pitcairnense","2":"Pitcairn","3":"Oceania","4":"Flowering Plant","5":"2000-2020","6":"Extinct in the Wild","7":"Species Management","8":"1"},{"1":"Abutilon pitcairnense","2":"Pitcairn","3":"Oceania","4":"Flowering Plant","5":"2000-2020","6":"Extinct in the Wild","7":"Law & Policy","8":"0"},{"1":"Abutilon pitcairnense","2":"Pitcairn","3":"Oceania","4":"Flowering Plant","5":"2000-2020","6":"Extinct in the Wild","7":"Research & Monitoring","8":"1"},{"1":"Abutilon pitcairnense","2":"Pitcairn","3":"Oceania","4":"Flowering Plant","5":"2000-2020","6":"Extinct in the Wild","7":"Education & Awareness","8":"0"},{"1":"Abutilon pitcairnense","2":"Pitcairn","3":"Oceania","4":"Flowering Plant","5":"2000-2020","6":"Extinct in the Wild","7":"Unknown","8":"0"}],"options":{"columns":{"min":{},"max":[10],"total":[8]},"rows":{"min":[10],"max":[10],"total":[6]},"pages":{}}}
+  </script>
+</div>
+<!-- rnb-frame-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<ol start="3" style="list-style-type: decimal">
+<li><code>threats</code>: The unit of observation is the threat/species combination, similar to the <code>actions</code> data set.</li>
+</ol>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-frame-begin eyJtZXRhZGF0YSI6eyJjbGFzc2VzIjpbInRibF9kZiIsInRibCIsImRhdGEuZnJhbWUiXSwibnJvdyI6NiwibmNvbCI6OH0sInJkZiI6Ikg0c0lBQUFBQUFBQUJzMVVRVy9UTUJUMnNxVnJnN29OVFlEZzVOTnVyVUluenFoMFErS0FxSVlRdTBXdTgwZ3RIRHR6bkc2OTdTZnZ6R0hscGJVTGliVGJFTFBreFA2K1o3L3ZlNDV6Y1haNUdsMUdoSkJkc2tjQ3NodmlrSFFtMDdlamR5TkM5Z0tjN1NEVHE5ODNHSFdNZ3k3Mm96ck1FUy9HczhvS3FSVXRoT1ZNR0FXcWhLZEhObFYzcDQ1NzlIa3p6LzRYRGt3SjlwalRab2JEajFKZmd4RXFvMVBKbFAwZmNGTlJieFRIOFdBVWorSi9BelN6SFovZldLRzRwVUpST3dmNlhjajBxVkJOcGEvSG1SRzhrcll5UUUvbytLcGlidVlDWG4wUVd1cE1jQ2JwQlpTNk1oem90KzJIL1hLaTh4d01GMGlmd1FLa0xuTFlIc3JSSjdWZ3BWZ0EvVm9BRjFBNi9NMjVBcE10NmRUb3RPSlc0TDA0b1orRnd0TnpFUWNUS1hKbWdVN21UR1gxVFRsWXEzNmd2Yjk3aUduOE1FTEZjaFN4S1VIWGdmMlpVRHBIQTBuTitnK2I2MHBacy9RbnpiWENVdjV4Rm1aR1Y0VVh1d1JtRXNsS201UUEvdm85TjVBbVVpREkwVWltdDVzOXMzTUR6Q1oyV2ZoMDBRWUNCV2xMY3MvbzY2R1gzY2NlM09KanRWcjlhbnZqS01CNzgyQ1VNc3VHUDB4dGpKRDcxcEo5WGRTMXgwVkIvUmNOVzR0M1RBczRyRlN0SkIzd2VhVitEazdyQkd0NjAvcHUzUGxyM04ya0RGWnVxOUJ0MVFHVllUMjlkc2xtSUgwMTBmSGE4TERBNit3TEhpRmFEcTIyek1kRlhFdVByTDJSKzkvQ1F5Wm5QUVlBQUE9PSJ9 -->
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["binomial_name"],"name":[1],"type":["chr"],"align":["left"]},{"label":["country"],"name":[2],"type":["chr"],"align":["left"]},{"label":["continent"],"name":[3],"type":["chr"],"align":["left"]},{"label":["group"],"name":[4],"type":["chr"],"align":["left"]},{"label":["year_last_seen"],"name":[5],"type":["chr"],"align":["left"]},{"label":["red_list_category"],"name":[6],"type":["chr"],"align":["left"]},{"label":["threat_type"],"name":[7],"type":["chr"],"align":["left"]},{"label":["threatened"],"name":[8],"type":["dbl"],"align":["right"]}],"data":[{"1":"Abutilon pitcairnense","2":"Pitcairn","3":"Oceania","4":"Flowering Plant","5":"2000-2020","6":"Extinct in the Wild","7":"Agriculture & Aquaculture","8":"0"},{"1":"Abutilon pitcairnense","2":"Pitcairn","3":"Oceania","4":"Flowering Plant","5":"2000-2020","6":"Extinct in the Wild","7":"Biological Resource Use","8":"0"},{"1":"Abutilon pitcairnense","2":"Pitcairn","3":"Oceania","4":"Flowering Plant","5":"2000-2020","6":"Extinct in the Wild","7":"Commercial Development","8":"0"},{"1":"Abutilon pitcairnense","2":"Pitcairn","3":"Oceania","4":"Flowering Plant","5":"2000-2020","6":"Extinct in the Wild","7":"Invasive Species","8":"1"},{"1":"Abutilon pitcairnense","2":"Pitcairn","3":"Oceania","4":"Flowering Plant","5":"2000-2020","6":"Extinct in the Wild","7":"Energy Production & Mining","8":"0"},{"1":"Abutilon pitcairnense","2":"Pitcairn","3":"Oceania","4":"Flowering Plant","5":"2000-2020","6":"Extinct in the Wild","7":"Climate Change","8":"0"}],"options":{"columns":{"min":{},"max":[10],"total":[8]},"rows":{"min":[10],"max":[10],"total":[6]},"pages":{}}}
+  </script>
+</div>
+<!-- rnb-frame-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>The latter two data sets are derivable from the plants dataset, so let me look there first.</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2tpbXI6OnNraW0ocGxhbnRzKVxuXG5gYGAifQ== -->
+<pre class="r"><code>skimr::skim(plants)
+</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiLS0gRGF0YSBTdW1tYXJ5IC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLVxuICAgICAgICAgICAgICAgICAgICAgICAgICAgVmFsdWVzXG5OYW1lICAgICAgICAgICAgICAgICAgICAgICBwbGFudHNcbk51bWJlciBvZiByb3dzICAgICAgICAgICAgIDUwMCAgIFxuTnVtYmVyIG9mIGNvbHVtbnMgICAgICAgICAgMjQgICAgXG5fX19fX19fX19fX19fX19fX19fX19fXyAgICAgICAgICBcbkNvbHVtbiB0eXBlIGZyZXF1ZW5jeTogICAgICAgICAgIFxuICBjaGFyYWN0ZXIgICAgICAgICAgICAgICAgNiAgICAgXG4gIG51bWVyaWMgICAgICAgICAgICAgICAgICAxOCAgICBcbl9fX19fX19fX19fX19fX19fX19fX19fXyAgICAgICAgIFxuR3JvdXAgdmFyaWFibGVzICAgICAgICAgICAgTm9uZSAgXG5cbi0tIFZhcmlhYmxlIHR5cGU6IGNoYXJhY3RlciAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS1cbiMgQSB0aWJibGU6IDYgeCA4XG4gIHNraW1fdmFyaWFibGUgICAgIG5fbWlzc2luZyBjb21wbGV0ZV9yYXRlICAgbWluICAgbWF4IGVtcHR5IG5fdW5pcXVlIHdoaXRlc3BhY2VcbiogPGNocj4gICAgICAgICAgICAgICAgIDxpbnQ+ICAgICAgICAgPGRibD4gPGludD4gPGludD4gPGludD4gICAgPGludD4gICAgICA8aW50PlxuMSBiaW5vbWlhbF9uYW1lICAgICAgICAgICAgIDAgICAgICAgICAgMSAgICAgICAxMSAgICAzNSAgICAgMCAgICAgIDUwMCAgICAgICAgICAwXG4yIGNvdW50cnkgICAgICAgICAgICAgICAgICAgMCAgICAgICAgICAxICAgICAgICA0ICAgIDQ0ICAgICAwICAgICAgIDcyICAgICAgICAgIDBcbjMgY29udGluZW50ICAgICAgICAgICAgICAgICAwICAgICAgICAgIDEgICAgICAgIDQgICAgMTMgICAgIDAgICAgICAgIDYgICAgICAgICAgMFxuNCBncm91cCAgICAgICAgICAgICAgICAgICAgIDAgICAgICAgICAgMSAgICAgICAgNSAgICAxNiAgICAgMCAgICAgICAgNiAgICAgICAgICAwXG41IHllYXJfbGFzdF9zZWVuICAgICAgICAgICAxNSAgICAgICAgICAwLjk3ICAgICA5ICAgIDExICAgICAwICAgICAgICA3ICAgICAgICAgIDBcbjYgcmVkX2xpc3RfY2F0ZWdvcnkgICAgICAgICAwICAgICAgICAgIDEgICAgICAgIDcgICAgMTkgICAgIDAgICAgICAgIDIgICAgICAgICAgMFxuXG4tLSBWYXJpYWJsZSB0eXBlOiBudW1lcmljIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tXG4jIEEgdGliYmxlOiAxOCB4IDExXG4gICBza2ltX3ZhcmlhYmxlIG5fbWlzc2luZyBjb21wbGV0ZV9yYXRlICBtZWFuICAgICBzZCAgICBwMCAgIHAyNSAgIHA1MCAgIHA3NSAgcDEwMCBoaXN0IFxuICogPGNocj4gICAgICAgICAgICAgPGludD4gICAgICAgICA8ZGJsPiA8ZGJsPiAgPGRibD4gPGRibD4gPGRibD4gPGRibD4gPGRibD4gPGRibD4gPGNocj5cbiAxIHRocmVhdF9BQSAgICAgICAgICAgICAwICAgICAgICAgICAgIDEgMC40NTQgMC40OTggICAgICAwICAgICAwICAgICAwICAgICAxICAgICAxIOKWh+KWgeKWgeKWgeKWhlxuIDIgdGhyZWF0X0JSVSAgICAgICAgICAgIDAgICAgICAgICAgICAgMSAwLjMwNiAwLjQ2MSAgICAgIDAgICAgIDAgICAgIDAgICAgIDEgICAgIDEg4paH4paB4paB4paB4paDXG4gMyB0aHJlYXRfUkNEICAgICAgICAgICAgMCAgICAgICAgICAgICAxIDAuMTcyIDAuMzc4ICAgICAgMCAgICAgMCAgICAgMCAgICAgMCAgICAgMSDilofiloHiloHiloHiloJcbiA0IHRocmVhdF9JU0dEICAgICAgICAgICAwICAgICAgICAgICAgIDEgMC4xNjIgMC4zNjkgICAgICAwICAgICAwICAgICAwICAgICAwICAgICAxIOKWh+KWgeKWgeKWgeKWglxuIDUgdGhyZWF0X0VQTSAgICAgICAgICAgIDAgICAgICAgICAgICAgMSAwLjA5ICAwLjI4NiAgICAgIDAgICAgIDAgICAgIDAgICAgIDAgICAgIDEg4paH4paB4paB4paB4paBXG4gNiB0aHJlYXRfQ0MgICAgICAgICAgICAgMCAgICAgICAgICAgICAxIDAuMDY4IDAuMjUyICAgICAgMCAgICAgMCAgICAgMCAgICAgMCAgICAgMSDilofiloHiloHiloHiloFcbiA3IHRocmVhdF9ISUQgICAgICAgICAgICAwICAgICAgICAgICAgIDEgMC4wNCAgMC4xOTYgICAgICAwICAgICAwICAgICAwICAgICAwICAgICAxIOKWh+KWgeKWgeKWgeKWgVxuIDggdGhyZWF0X1AgICAgICAgICAgICAgIDAgICAgICAgICAgICAgMSAwLjAyOCAwLjE2NSAgICAgIDAgICAgIDAgICAgIDAgICAgIDAgICAgIDEg4paH4paB4paB4paB4paBXG4gOSB0aHJlYXRfVFMgICAgICAgICAgICAgMCAgICAgICAgICAgICAxIDAuMDIyIDAuMTQ3ICAgICAgMCAgICAgMCAgICAgMCAgICAgMCAgICAgMSDilofiloHiloHiloHiloFcbjEwIHRocmVhdF9OU00gICAgICAgICAgICAwICAgICAgICAgICAgIDEgMC4yMDYgMC40MDUgICAgICAwICAgICAwICAgICAwICAgICAwICAgICAxIOKWh+KWgeKWgeKWgeKWglxuMTEgdGhyZWF0X0dFICAgICAgICAgICAgIDAgICAgICAgICAgICAgMSAwLjAzNiAwLjE4NiAgICAgIDAgICAgIDAgICAgIDAgICAgIDAgICAgIDEg4paH4paB4paB4paB4paBXG4xMiB0aHJlYXRfTkEgICAgICAgICAgICAgMCAgICAgICAgICAgICAxIDAuMjE0IDAuNDExICAgICAgMCAgICAgMCAgICAgMCAgICAgMCAgICAgMSDilofiloHiloHiloHiloJcbjEzIGFjdGlvbl9MV1AgICAgICAgICAgICAwICAgICAgICAgICAgIDEgMC4xMyAgMC4zMzcgICAgICAwICAgICAwICAgICAwICAgICAwICAgICAxIOKWh+KWgeKWgeKWgeKWgVxuMTQgYWN0aW9uX1NNICAgICAgICAgICAgIDAgICAgICAgICAgICAgMSAwLjExNiAwLjMyMSAgICAgIDAgICAgIDAgICAgIDAgICAgIDAgICAgIDEg4paH4paB4paB4paB4paBXG4xNSBhY3Rpb25fTFAgICAgICAgICAgICAgMCAgICAgICAgICAgICAxIDAuMDU4IDAuMjM0ICAgICAgMCAgICAgMCAgICAgMCAgICAgMCAgICAgMSDilofiloHiloHiloHiloFcbjE2IGFjdGlvbl9STSAgICAgICAgICAgICAwICAgICAgICAgICAgIDEgMC4wNTQgMC4yMjYgICAgICAwICAgICAwICAgICAwICAgICAwICAgICAxIOKWh+KWgeKWgeKWgeKWgVxuMTcgYWN0aW9uX0VBICAgICAgICAgICAgIDAgICAgICAgICAgICAgMSAwLjAwMiAwLjA0NDcgICAgIDAgICAgIDAgICAgIDAgICAgIDAgICAgIDEg4paH4paB4paB4paB4paBXG4xOCBhY3Rpb25fTkEgICAgICAgICAgICAgMCAgICAgICAgICAgICAxIDAuNzU4IDAuNDI5ICAgICAgMCAgICAgMSAgICAgMSAgICAgMSAgICAgMSDiloLiloHiloHiloHilodcbiJ9 -->
+<pre><code>-- Data Summary ------------------------
+                           Values
+Name                       plants
+Number of rows             500   
+Number of columns          24    
+_______________________          
+Column type frequency:           
+  character                6     
+  numeric                  18    
+________________________         
+Group variables            None  
+
+-- Variable type: character ---------------------------------------------------------------------------------------
+# A tibble: 6 x 8
+  skim_variable     n_missing complete_rate   min   max empty n_unique whitespace
+* &lt;chr&gt;                 &lt;int&gt;         &lt;dbl&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt;    &lt;int&gt;      &lt;int&gt;
+1 binomial_name             0          1       11    35     0      500          0
+2 country                   0          1        4    44     0       72          0
+3 continent                 0          1        4    13     0        6          0
+4 group                     0          1        5    16     0        6          0
+5 year_last_seen           15          0.97     9    11     0        7          0
+6 red_list_category         0          1        7    19     0        2          0
+
+-- Variable type: numeric -----------------------------------------------------------------------------------------
+# A tibble: 18 x 11
+   skim_variable n_missing complete_rate  mean     sd    p0   p25   p50   p75  p100 hist 
+ * &lt;chr&gt;             &lt;int&gt;         &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;chr&gt;
+ 1 threat_AA             0             1 0.454 0.498      0     0     0     1     1 ▇▁▁▁▆
+ 2 threat_BRU            0             1 0.306 0.461      0     0     0     1     1 ▇▁▁▁▃
+ 3 threat_RCD            0             1 0.172 0.378      0     0     0     0     1 ▇▁▁▁▂
+ 4 threat_ISGD           0             1 0.162 0.369      0     0     0     0     1 ▇▁▁▁▂
+ 5 threat_EPM            0             1 0.09  0.286      0     0     0     0     1 ▇▁▁▁▁
+ 6 threat_CC             0             1 0.068 0.252      0     0     0     0     1 ▇▁▁▁▁
+ 7 threat_HID            0             1 0.04  0.196      0     0     0     0     1 ▇▁▁▁▁
+ 8 threat_P              0             1 0.028 0.165      0     0     0     0     1 ▇▁▁▁▁
+ 9 threat_TS             0             1 0.022 0.147      0     0     0     0     1 ▇▁▁▁▁
+10 threat_NSM            0             1 0.206 0.405      0     0     0     0     1 ▇▁▁▁▂
+11 threat_GE             0             1 0.036 0.186      0     0     0     0     1 ▇▁▁▁▁
+12 threat_NA             0             1 0.214 0.411      0     0     0     0     1 ▇▁▁▁▂
+13 action_LWP            0             1 0.13  0.337      0     0     0     0     1 ▇▁▁▁▁
+14 action_SM             0             1 0.116 0.321      0     0     0     0     1 ▇▁▁▁▁
+15 action_LP             0             1 0.058 0.234      0     0     0     0     1 ▇▁▁▁▁
+16 action_RM             0             1 0.054 0.226      0     0     0     0     1 ▇▁▁▁▁
+17 action_EA             0             1 0.002 0.0447     0     0     0     0     1 ▇▁▁▁▁
+18 action_NA             0             1 0.758 0.429      0     1     1     1     1 ▂▁▁▁▇</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>There are 500 plant species from 72 countries of origin on 6 out of 7 continents. Most, I would guess, are flowering plants. There are two possible ‘red list’ categories: extinct and extinct in the wild. The means of the numeric variables provide a convenient way of seeing how they are distributed. For example, almost half the species are threatened by agriculture and aquaculture (AA), while only 4% were threatened by human intrusions (HID). A species may be threatened by one or more different threats. A shocking figure is that only 0.2% of the species (that’s 1 out of all 500) were the target of education and awareness action. In fact, actions are few; 76% have no action to save them registered. (The NA action is, I’m guessing, exclusive of all the other actions.)</p>
+<p>It’s easier to understand the data if you know what plant groups are considered here.</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxucGxhbnRzICU+JSBcbiAgdGFieWwoZ3JvdXApXG5cbmBgYCJ9 -->
+<pre class="r"><code>plants %&gt;% 
+  tabyl(group)
+</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiICAgICAgICAgICAgZ3JvdXAgICBuIHBlcmNlbnRcbiAgICAgICAgICAgIEFsZ2FlICAgMyAgIDAuMDA2XG4gICAgICAgICAgQ29uaWZlciAgIDEgICAwLjAwMlxuICAgICAgICAgICAgQ3ljYWQgICA4ICAgMC4wMTZcbiBGZXJucyBhbmQgQWxsaWVzICAxMyAgIDAuMDI2XG4gIEZsb3dlcmluZyBQbGFudCA0NzEgICAwLjk0MlxuICAgICAgICAgICBNb3NzZXMgICA0ICAgMC4wMDhcbiJ9 -->
+<pre><code>            group   n percent
+            Algae   3   0.006
+          Conifer   1   0.002
+            Cycad   8   0.016
+ Ferns and Allies  13   0.026
+  Flowering Plant 471   0.942
+           Mosses   4   0.008</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>The results here are somewhat surprising. There is only one conifer listed, despite 34% of conifers being endangered. Ferns and fern allies represent the second largest category after flowering plants, which I’m happy to see. And the mosses have a good showing as well.</p>
+<p>Okay, so I have a sense of the data now. Before I go any further, I’m going to flesh out the ‘background’ section using the links the Tidy team offered.</p>
+</div>
+</div>
+<div id="questions" class="section level1">
+<h1>Questions</h1>
+<p>There are a million questions I want to ask about this topic, of course, but let me stay very limited. What is the leading cause of extinction? What plant families get the most attention? For that one, I’ll need to match each species to its full scientific name, which could be a task given how rare some of these are. But I’m very interested in finding a database of plant names for just that purpose.</p>
+<p>I have country of origin information, so I could plot the density by country (like <a href="https://twitter.com/JDavison_/status/1295385653593743361">this twitter post</a>). I could explore a number of topics this way, but because it’s on a global scale I don’t think I would find it satisfying.</p>
+<p>If I could merge in extra plant data, that would be the most satisfying, I think. Which habitats are most endangered? Why the tropics? Where were these plants last recorded in the wild? In large numbers? That might be asking a lot. I shoud perhaps limit myself at first.</p>
 <!-- rnb-text-end -->
 </div>
 
-<div id="rmd-source-code">LS0tDQp0aXRsZTogIkV4dGluY3QgUGxhbnRzIg0Kb3V0cHV0OiBodG1sX25vdGVib29rDQotLS0NCg0KVGhpcyBkYXRhc2V0IGNhbWUgb3V0IEF1Z3VzdCAxOCwgMjAyMCAoSSBnb3QgaXQgYSBkYXkgZWFybHkpLiBUaGUgcGFnZSBpcyBbaGVyZV0oaHR0cHM6Ly9naXRodWIuY29tL3Jmb3JkYXRhc2NpZW5jZS90aWR5dHVlc2RheS9ibG9iL21hc3Rlci9kYXRhLzIwMjAvMjAyMC0wOC0xOC9yZWFkbWUubWQpLiBUaGUgR2l0SHViIHBhZ2UgYWxzbyBwcm92aWRlcyB0aHJlZSBsaW5rcyBmb3IgbW9yZSBpbmZvcm1hdGlvbjogDQoNCi0gVGhlIFtJVUNOIG1haW4gcGFnZV0oaHR0cHM6Ly93d3cuaXVjbnJlZGxpc3Qub3JnLykNCi0gQSBbc3R1ZHkgcHVibGlzaGVkIGluIDIwMTldKGh0dHBzOi8vYWR2YW5jZXMuc2NpZW5jZW1hZy5vcmcvY29udGVudC81LzExL2VhYXg5NDQ0KQ0KLSBBbiBbSVVDTiBibG9nIHBvc3RdKGh0dHBzOi8vd3d3Lml1Y24ub3JnL25ld3Mvc3BlY2llcy8yMDE5MDkvb3Zlci1oYWxmLWV1cm9wZXMtZW5kZW1pYy10cmVlcy1mYWNlLWV4dGluY3Rpb24pDQoNCkl0J3MgYSBsaXR0bGUgbGF0ZSwgc28gSSdtIGdvaW5nIHRvIG1ha2UgYSBnb29kIHJvdW5kIHN0YXJ0IHRvbmlnaHQsIG1vc3RseSByZWFkaW5nIGFuZCBkb2luZyB0aGUgdHlwaWNhbCBkYXRhIHNraW0gd2l0aCBgc2tpbXI6OnNraW0oKWAuIA0KDQojIEJhY2tncm91bmQNCg0KDQojIFRoZSBEYXRhDQpUaGUgZGF0YSBjb21lcyBmcm9tIHRoZSBJbnRlcm5hdGlvbmFsIFVuaW9uIGZvciBDb25zZXJ2YXRpb24gb2YgTmF0dXJlIChJVUNOKSBSZWQgTGlzdCBvZiBUaHJlYXRlbmVkIFNwZWNpZXMgKFZlcnNpb24gMjAyMC0xKS4gSXQgd2FzIHByZXBhcmVkIGJ5IEZsb3JlbnQgTGF2ZXJnbmUgZm9yIGhpcyBbaW5mb2dyYXBoaWNdKGh0dHBzOi8vd3d3LmJlaGFuY2UubmV0L2dhbGxlcnkvOTgzMDQ0NTMvSW5mb2dyYXBoaWMtUGxhbnRzLWluLURhbmdlciku</div>
+<div id="rmd-source-code">LS0tDQp0aXRsZTogIkV4dGluY3QgUGxhbnRzIg0Kb3V0cHV0OiBodG1sX25vdGVib29rDQotLS0NCg0KYGBge3IsIGluY2x1ZGU9RkFMU0V9DQpsaWJyYXJ5KHRpZHl2ZXJzZSkNCmxpYnJhcnkoc2tpbXIpDQpsaWJyYXJ5KGx1YnJpZGF0ZSkNCmxpYnJhcnkoamFuaXRvcikNCmBgYA0KDQoNCg0KVGhpcyBkYXRhc2V0IGNhbWUgb3V0IEF1Z3VzdCAxOCwgMjAyMCAoSSBnb3QgaXQgYSBkYXkgZWFybHkpLiBUaGUgcGFnZSBpcyBbaGVyZV0oaHR0cHM6Ly9naXRodWIuY29tL3Jmb3JkYXRhc2NpZW5jZS90aWR5dHVlc2RheS9ibG9iL21hc3Rlci9kYXRhLzIwMjAvMjAyMC0wOC0xOC9yZWFkbWUubWQpLiBUaGUgR2l0SHViIHBhZ2UgYWxzbyBwcm92aWRlcyB0aHJlZSBsaW5rcyBmb3IgbW9yZSBpbmZvcm1hdGlvbjogDQoNCi0gVGhlIFtJVUNOIG1haW4gcGFnZV0oaHR0cHM6Ly93d3cuaXVjbnJlZGxpc3Qub3JnLykNCi0gQSBbc3R1ZHkgcHVibGlzaGVkIGluIDIwMTldKGh0dHBzOi8vYWR2YW5jZXMuc2NpZW5jZW1hZy5vcmcvY29udGVudC81LzExL2VhYXg5NDQ0KQ0KLSBBbiBbSVVDTiBibG9nIHBvc3RdKGh0dHBzOi8vd3d3Lml1Y24ub3JnL25ld3Mvc3BlY2llcy8yMDE5MDkvb3Zlci1oYWxmLWV1cm9wZXMtZW5kZW1pYy10cmVlcy1mYWNlLWV4dGluY3Rpb24pDQoNCkl0J3MgYSBsaXR0bGUgbGF0ZSwgc28gSSdtIGdvaW5nIHRvIG1ha2UgYSBnb29kIHJvdW5kIHN0YXJ0IHRvbmlnaHQsIG1vc3RseSByZWFkaW5nIGFuZCBkb2luZyB0aGUgdHlwaWNhbCBkYXRhIHNraW0gd2l0aCBgc2tpbXI6OnNraW0oKWAuIA0KDQojIEJhY2tncm91bmQNClF1ZXN0aW9uOiBXaGF0IGlzIHRoZSBJVUNOIFJlZCBMaXN0PyANCg0KPiBFc3RhYmxpc2hlZCBpbiAxOTY0LCBUaGUgSW50ZXJuYXRpb25hbCBVbmlvbiBmb3IgQ29uc2VydmF0aW9uIG9mIE5hdHVyZeKAmXMgUmVkIExpc3Qgb2YgVGhyZWF0ZW5lZCBTcGVjaWVzIGhhcyBldm9sdmVkIHRvIGJlY29tZSB0aGUgd29ybGTigJlzIG1vc3QgY29tcHJlaGVuc2l2ZSBpbmZvcm1hdGlvbiBzb3VyY2Ugb24gdGhlIGdsb2JhbCBjb25zZXJ2YXRpb24gc3RhdHVzIG9mIGFuaW1hbCwgZnVuZ2kgYW5kIHBsYW50IHNwZWNpZXMuDQpUaGUgSVVDTiBSZWQgTGlzdCBpcyBhIGNyaXRpY2FsIGluZGljYXRvciBvZiB0aGUgaGVhbHRoIG9mIHRoZSB3b3JsZOKAmXMgYmlvZGl2ZXJzaXR5LiBGYXIgbW9yZSB0aGFuIGEgbGlzdCBvZiBzcGVjaWVzIGFuZCB0aGVpciBzdGF0dXMsIGl0IGlzIGEgcG93ZXJmdWwgdG9vbCB0byBpbmZvcm0gYW5kIGNhdGFseXplIGFjdGlvbiBmb3IgYmlvZGl2ZXJzaXR5IGNvbnNlcnZhdGlvbiBhbmQgcG9saWN5IGNoYW5nZSwgY3JpdGljYWwgdG8gcHJvdGVjdGluZyB0aGUgbmF0dXJhbCByZXNvdXJjZXMgd2UgbmVlZCB0byBzdXJ2aXZlLiBJdCBwcm92aWRlcyBpbmZvcm1hdGlvbiBhYm91dCByYW5nZSwgcG9wdWxhdGlvbiBzaXplLCBoYWJpdGF0IGFuZCBlY29sb2d5LCB1c2UgYW5kL29yIHRyYWRlLCB0aHJlYXRzLCBhbmQgY29uc2VydmF0aW9uIGFjdGlvbnMgdGhhdCB3aWxsIGhlbHAgaW5mb3JtIG5lY2Vzc2FyeSBjb25zZXJ2YXRpb24gZGVjaXNpb25zLg0KDQpUaGlzIGlzIGZyb20gdGhlIElVQ04gUmVkIExpc3Qgd2Vic2l0ZS4gQWxzbyBvbiB0aGVpciB3ZWJzaXRlIGlzIGEgYnJpZWYgdGFsbHkgb2Ygc3BlY2llcyB0aHJlYXRlbmVkIGJ5IGV4dGluY3Rpb24uIA0KDQotIDQxJSBvZiBhbXBoaWJpYW5zDQotIDI2JSBvZiBtYW1tYWxzDQotIDM0JSBvZiBjb25pZmVycw0KLSAxNCUgb2YgYmlyZHMNCi0gMzAlIG9mIHNoYXJrcyBhbmQgcmF5cw0KLSAzMyUgb2YgcmVlZiBjb3JhbHMNCi0gMjglIG9mIHNlbGVjdGVkIGNydXN0YWNlYW5zDQotIDI3JSBvZiBhbGwgYXNzZXNzZWQgc3BlY2llczsgdGhhdCdzIG1vcmUgdGhhbiAzMiwwMDAgc3BlY2llcyB0aHJlYXRlbmVkIHdpdGggZXh0aW5jdGlvbi4NCg0KVGhlIGRhdGEgSSdtIHdvcmtpbmcgd2l0aCBkZWFscyB3aXRoIHBsYW50cywgaS5lLiBhbnl0aGluZyBpbiB0aGUga2luZ2RvbSBQbGFudGFlLiBNeSBiZXN0IGd1ZXNzIGlzIHRoYXQgbW9zdCBlbmRhbmdlcmVkIHNwZWNpZXMgYXJlIGZsb3dlcmluZyBwbGFudHMsIGJ1dCBJJ20gbm90IHN1cnByaXNlZCB0aGF0IGNvbmlmZXJzIGhhdmUgc3VjaCBhIGhpZ2ggcmF0ZSBvZiBnb2luZyBleHRpbmN0LiBUaGVyZSBhcmUgdmVyeSBmZXcgc3BlY2llcyBvZiBneW1ub3NwZXJtcyBjb21wYXJlZCB0byB0aGUgZmxvd2VyaW5nIHBsYW50cywgYW5kIHRoZXkgb2Z0ZW4gaGF2ZSB2ZXJ5IHNwZWNpZmljIGxpdmluZyBjb25kaXRpb25zLiBUaGV5IGFyZSB1c3VhbGx5IHRyZWVzLCB3aGljaCBtYWtlcyB0aGVtIHRhcmdldHMgb2YgZGVmb3Jlc3RhdGlvbi4gDQoNCiMgVGhlIERhdGENClRoZSBkYXRhIGNvbWVzIGZyb20gdGhlIEludGVybmF0aW9uYWwgVW5pb24gZm9yIENvbnNlcnZhdGlvbiBvZiBOYXR1cmUgKElVQ04pIFJlZCBMaXN0IG9mIFRocmVhdGVuZWQgU3BlY2llcyAoVmVyc2lvbiAyMDIwLTEpLiBJdCB3YXMgcHJlcGFyZWQgYnkgRmxvcmVudCBMYXZlcmduZSBmb3IgaGlzIFtpbmZvZ3JhcGhpY10oaHR0cHM6Ly93d3cuYmVoYW5jZS5uZXQvZ2FsbGVyeS85ODMwNDQ1My9JbmZvZ3JhcGhpYy1QbGFudHMtaW4tRGFuZ2VyKS4NCg0KIyMgR2V0dGluZyB0aGUgZGF0YQ0KYGBge3J9DQpwbGFudHMgPC0gcmVhZHI6OnJlYWRfY3N2KCdodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vcmZvcmRhdGFzY2llbmNlL3RpZHl0dWVzZGF5L21hc3Rlci9kYXRhLzIwMjAvMjAyMC0wOC0xOC9wbGFudHMuY3N2JykNCmFjdGlvbnMgPC0gcmVhZHI6OnJlYWRfY3N2KCdodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vcmZvcmRhdGFzY2llbmNlL3RpZHl0dWVzZGF5L21hc3Rlci9kYXRhLzIwMjAvMjAyMC0wOC0xOC9hY3Rpb25zLmNzdicpDQp0aHJlYXRzIDwtIHJlYWRyOjpyZWFkX2NzdignaHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3Jmb3JkYXRhc2NpZW5jZS90aWR5dHVlc2RheS9tYXN0ZXIvZGF0YS8yMDIwLzIwMjAtMDgtMTgvdGhyZWF0cy5jc3YnKQ0KDQpzYXZlKHBsYW50cywgYWN0aW9ucywgdGhyZWF0cywgZmlsZSA9ICJkYXRhL2V4dGluY3RfcGxhbnRzLlJEYXRhIikNCmBgYA0KDQpUaGUgZGF0YSBkaWN0aW9uYXJpZXMgZm9yIHRoZXNlIGFyZSBvYnZpb3VzbHkgbG9uZywgc28gSSB3aWxsIHJlZmVyZW5jZSB0aGVtIHdoZW4gbmVjZXNzYXJ5LiBUaGUgZGF0YSBpcyBvcmdhbml6ZWQgaW50byB0aHJlZSBkYXRhIHNldHMuIA0KDQoxLiBgcGxhbnRzYDogSW4gdGhpcyBkYXRhIHNldCwgdGhlIHVuaXQgb2Ygb2JzZXJ2YXRpb24gaXMgdGhlIHBsYW50LiBGb3IgZWFjaCBwbGFudCwgZWFjaCB2YXJpYWJsZSBkZXNjcmliZXMgb25lIG9mIHRoZSBwbGFudCdzIGNoYXJhY3RlcmlzdGljcy4gRXhhbXBsZXMgaW5jbHVkZSB0aGUgY291bnRyeSBvZiBvcmlnaW4sIHRoZSB0YXhvbm9taWMgZ3JvdXAsIGluZGljYXRvcnMgZm9yIHdoZXRoZXIgdGhlIHBsYW50IGlzIHRocmVhdGVuZWQgYnkgYSBnaXZlbiB0aHJlYXQsIGFuZCBpbmRpY2F0b3JzIGZvciB3aGV0aGVyIHRoZSBwbGFudCBpcyB0aGUgdGFyZ2V0IG9mIGEgZ2l2ZW4gY29uc2VydmF0aW9uIGFjdGlvbi4gDQpgYGB7cn0NCmhlYWQocGxhbnRzKQ0KYGBgDQoNCg0KDQoyLiBgYWN0aW9uc2A6IFRoZSB1bml0IG9mIG9ic2VydmF0aW9uIGlzIHRoZSBhY3Rpb24vcGxhbnQgY29tYmluYXRpb24uIEluIG90aGVyIHdvcmRzLCB0aGlzIGlzIHNpbXBseSBhIGZ1bGx5IGludGVyYWN0ZWQgdmVyc2lvbiBvZiB0aGUgYHBsYW50c2AgZGF0YSBzZXQuIA0KYGBge3J9DQpoZWFkKGFjdGlvbnMpDQpgYGANCg0KMy4gYHRocmVhdHNgOiBUaGUgdW5pdCBvZiBvYnNlcnZhdGlvbiBpcyB0aGUgdGhyZWF0L3NwZWNpZXMgY29tYmluYXRpb24sIHNpbWlsYXIgdG8gdGhlIGBhY3Rpb25zYCBkYXRhIHNldC4gDQpgYGB7cn0NCmhlYWQodGhyZWF0cykNCmBgYA0KDQpUaGUgbGF0dGVyIHR3byBkYXRhIHNldHMgYXJlIGRlcml2YWJsZSBmcm9tIHRoZSBwbGFudHMgZGF0YXNldCwgc28gbGV0IG1lIGxvb2sgdGhlcmUgZmlyc3QuIA0KDQpgYGB7cn0NCnNraW1yOjpza2ltKHBsYW50cykNCmBgYA0KDQpUaGVyZSBhcmUgNTAwIHBsYW50IHNwZWNpZXMgZnJvbSA3MiBjb3VudHJpZXMgb2Ygb3JpZ2luIG9uIDYgb3V0IG9mIDcgY29udGluZW50cy4gTW9zdCwgSSB3b3VsZCBndWVzcywgYXJlIGZsb3dlcmluZyBwbGFudHMuIFRoZXJlIGFyZSB0d28gcG9zc2libGUgJ3JlZCBsaXN0JyBjYXRlZ29yaWVzOiBleHRpbmN0IGFuZCBleHRpbmN0IGluIHRoZSB3aWxkLiBUaGUgbWVhbnMgb2YgdGhlIG51bWVyaWMgdmFyaWFibGVzIHByb3ZpZGUgYSBjb252ZW5pZW50IHdheSBvZiBzZWVpbmcgaG93IHRoZXkgYXJlIGRpc3RyaWJ1dGVkLiBGb3IgZXhhbXBsZSwgYWxtb3N0IGhhbGYgdGhlIHNwZWNpZXMgYXJlIHRocmVhdGVuZWQgYnkgYWdyaWN1bHR1cmUgYW5kIGFxdWFjdWx0dXJlIChBQSksIHdoaWxlIG9ubHkgNCUgd2VyZSB0aHJlYXRlbmVkIGJ5IGh1bWFuIGludHJ1c2lvbnMgKEhJRCkuIEEgc3BlY2llcyBtYXkgYmUgdGhyZWF0ZW5lZCBieSBvbmUgb3IgbW9yZSBkaWZmZXJlbnQgdGhyZWF0cy4gQSBzaG9ja2luZyBmaWd1cmUgaXMgdGhhdCBvbmx5IDAuMiUgb2YgdGhlIHNwZWNpZXMgKHRoYXQncyAxIG91dCBvZiBhbGwgNTAwKSB3ZXJlIHRoZSB0YXJnZXQgb2YgZWR1Y2F0aW9uIGFuZCBhd2FyZW5lc3MgYWN0aW9uLiBJbiBmYWN0LCBhY3Rpb25zIGFyZSBmZXc7IDc2JSBoYXZlIG5vIGFjdGlvbiB0byBzYXZlIHRoZW0gcmVnaXN0ZXJlZC4gKFRoZSBOQSBhY3Rpb24gaXMsIEknbSBndWVzc2luZywgZXhjbHVzaXZlIG9mIGFsbCB0aGUgb3RoZXIgYWN0aW9ucy4pIA0KDQpJdCdzIGVhc2llciB0byB1bmRlcnN0YW5kIHRoZSBkYXRhIGlmIHlvdSBrbm93IHdoYXQgcGxhbnQgZ3JvdXBzIGFyZSBjb25zaWRlcmVkIGhlcmUuIA0KYGBge3J9DQpwbGFudHMgJT4lIA0KICB0YWJ5bChncm91cCkNCmBgYA0KVGhlIHJlc3VsdHMgaGVyZSBhcmUgc29tZXdoYXQgc3VycHJpc2luZy4gVGhlcmUgaXMgb25seSBvbmUgY29uaWZlciBsaXN0ZWQsIGRlc3BpdGUgMzQlIG9mIGNvbmlmZXJzIGJlaW5nIGVuZGFuZ2VyZWQuIEZlcm5zIGFuZCBmZXJuIGFsbGllcyByZXByZXNlbnQgdGhlIHNlY29uZCBsYXJnZXN0IGNhdGVnb3J5IGFmdGVyIGZsb3dlcmluZyBwbGFudHMsIHdoaWNoIEknbSBoYXBweSB0byBzZWUuIEFuZCB0aGUgbW9zc2VzIGhhdmUgYSBnb29kIHNob3dpbmcgYXMgd2VsbC4gDQoNCk9rYXksIHNvIEkgaGF2ZSBhIHNlbnNlIG9mIHRoZSBkYXRhIG5vdy4gQmVmb3JlIEkgZ28gYW55IGZ1cnRoZXIsIEknbSBnb2luZyB0byBmbGVzaCBvdXQgdGhlICdiYWNrZ3JvdW5kJyBzZWN0aW9uIHVzaW5nIHRoZSBsaW5rcyB0aGUgVGlkeSB0ZWFtIG9mZmVyZWQuIA0KDQoNCiMgUXVlc3Rpb25zDQpUaGVyZSBhcmUgYSBtaWxsaW9uIHF1ZXN0aW9ucyBJIHdhbnQgdG8gYXNrIGFib3V0IHRoaXMgdG9waWMsIG9mIGNvdXJzZSwgYnV0IGxldCBtZSBzdGF5IHZlcnkgbGltaXRlZC4gV2hhdCBpcyB0aGUgbGVhZGluZyBjYXVzZSBvZiBleHRpbmN0aW9uPyBXaGF0IHBsYW50IGZhbWlsaWVzIGdldCB0aGUgbW9zdCBhdHRlbnRpb24/IEZvciB0aGF0IG9uZSwgSSdsbCBuZWVkIHRvIG1hdGNoIGVhY2ggc3BlY2llcyB0byBpdHMgZnVsbCBzY2llbnRpZmljIG5hbWUsIHdoaWNoIGNvdWxkIGJlIGEgdGFzayBnaXZlbiBob3cgcmFyZSBzb21lIG9mIHRoZXNlIGFyZS4gQnV0IEknbSB2ZXJ5IGludGVyZXN0ZWQgaW4gZmluZGluZyBhIGRhdGFiYXNlIG9mIHBsYW50IG5hbWVzIGZvciBqdXN0IHRoYXQgcHVycG9zZS4gDQoNCkkgaGF2ZSBjb3VudHJ5IG9mIG9yaWdpbiBpbmZvcm1hdGlvbiwgc28gSSBjb3VsZCBwbG90IHRoZSBkZW5zaXR5IGJ5IGNvdW50cnkgKGxpa2UgW3RoaXMgdHdpdHRlciBwb3N0XShodHRwczovL3R3aXR0ZXIuY29tL0pEYXZpc29uXy9zdGF0dXMvMTI5NTM4NTY1MzU5Mzc0MzM2MSkpLiBJIGNvdWxkIGV4cGxvcmUgYSBudW1iZXIgb2YgdG9waWNzIHRoaXMgd2F5LCBidXQgYmVjYXVzZSBpdCdzIG9uIGEgZ2xvYmFsIHNjYWxlIEkgZG9uJ3QgdGhpbmsgSSB3b3VsZCBmaW5kIGl0IHNhdGlzZnlpbmcuIA0KDQpJZiBJIGNvdWxkIG1lcmdlIGluIGV4dHJhIHBsYW50IGRhdGEsIHRoYXQgd291bGQgYmUgdGhlIG1vc3Qgc2F0aXNmeWluZywgSSB0aGluay4gV2hpY2ggaGFiaXRhdHMgYXJlIG1vc3QgZW5kYW5nZXJlZD8gV2h5IHRoZSB0cm9waWNzPyBXaGVyZSB3ZXJlIHRoZXNlIHBsYW50cyBsYXN0IHJlY29yZGVkIGluIHRoZSB3aWxkPyBJbiBsYXJnZSBudW1iZXJzPyBUaGF0IG1pZ2h0IGJlIGFza2luZyBhIGxvdC4gSSBzaG91ZCBwZXJoYXBzIGxpbWl0IG15c2VsZiBhdCBmaXJzdC4g</div>
 
 
 
