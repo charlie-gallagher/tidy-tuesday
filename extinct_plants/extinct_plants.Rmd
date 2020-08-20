@@ -94,3 +94,184 @@ There are a million questions I want to ask about this topic, of course, but let
 I have country of origin information, so I could plot the density by country (like [this twitter post](https://twitter.com/JDavison_/status/1295385653593743361)). I could explore a number of topics this way, but because it's on a global scale I don't think I would find it satisfying. 
 
 If I could merge in extra plant data, that would be the most satisfying, I think. Which habitats are most endangered? Why the tropics? Where were these plants last recorded in the wild? In large numbers? That might be asking a lot. I shoud perhaps limit myself at first. 
+
+I don't have a good dictionary of styles of dictionaries. One that I like, though, is the long graphic made up of a bunch of rows, each with a circle that gets filled in when a certain characteristic is present. Let me try to make one of these myself, and then I'll look at some source code.
+
+One style is the raster grid (see [here](https://twitter.com/kllycttn/status/1295771562319257610)). Someone mentioned the `waffle` package in conjunction with a raster-style graphic like this. Yeah, I would like to learn more about this package; it looks interesting, at least. 
+
+Another is [this](https://twitter.com/MaiaPelletier/status/1295762163118858240) graphic with really nice dot-style data visualizing. This same person mentioned the package `extrafont` which seems like it makes Windows fonts available to you... I need that. Agh fonts are such a pain. I need a slew of programs and packages before I can use the package. Some time I'll learn more about that. For now, I'll suffer the painful version of writing most of the text in GIMP or something. 
+
+There's another visualization called a stream plot (from the package `streamgraph`) which always looks killer. I guess if you want to stand out in this game, you have to be on top of your packages. You need the ones that work and the ones that don't -- that's how you get there first and stand out. This package lives on github, so you'll need to go to the source to get it. 
+
+Okay, let's get back on track.
+
+1. What information do I want to portray? 
+2. What key elements do I have to work with? 
+3. Which visualization would portray those key elements the best way? 
+
+To answer the first question, I don't have many options. I have information on the plants, their locations, the actions being taken to protect them (sparse) and the threats against them (complete). How can I present all 500 plants in a way that is appealing and recognizable? I could restrict my search to only the lesser known forms of plants (not flowering plants), because they don't get the attention they deserve. I could compare efforts to save flowering plants and non-flowering plants. Let me see what that would look like. 
+
+```{r}
+plants %>% 
+  tabyl(group, action_LWP)
+```
+
+```{r}
+plants %>% 
+  tabyl(group, action_SM)
+```
+
+These are the top two actions: land and water protection (LWP) and species management (SM). I don't quite know what those entail.
+
+Maybe, instead, I can look at the threats facing the different groups. 
+
+```{r}
+group_threats <- plants %>% 
+  group_by(group) %>% 
+  summarize(
+    aa = mean(threat_AA, na.rm = TRUE),
+    bru = mean(threat_BRU, na.rm = TRUE),
+    rcd = mean(threat_RCD, na.rm = TRUE),
+    isgd = mean(threat_ISGD, na.rm = TRUE),
+    epm = mean(threat_EPM, na.rm = TRUE),
+    cc = mean(threat_CC, na.rm = TRUE),
+    hid = mean(threat_HID, na.rm = TRUE),
+    p = mean(threat_P, na.rm = TRUE),
+    ts = mean(threat_TS, na.rm = TRUE),
+    nsm = mean(threat_NSM, na.rm = TRUE),
+    ge = mean(threat_GE, na.rm = TRUE),
+    na = mean(threat_NA, na.rm = TRUE)
+  ) %>% 
+  pivot_longer(cols = c(aa, bru, rcd, isgd, epm, cc, hid, p, ts, nsm, ge, na),
+               names_to = 'threat', values_to = 'pct_species')
+```
+
+This gives me a little more to look at. Let's visualize it real quick. 
+
+```{r}
+group_threats %>% 
+  ggplot() + 
+  geom_col(aes(x = threat, y = pct_species, group = group, fill = group),
+           position = 'dodge') + 
+  scale_fill_brewer(palette = 2)
+```
+
+Just to get something on the, I'll try doing many pie charts where each pie is a group/threat. I'm not sure how to approach such a heavily faceted graphic. Initially, a customized ggplot seems fine, but there has to be a better way... Well, let's see. I still probably have to change the data so that there is a complement for every pie. 
+
+### Reviewing pie charts
+Let's start with the basic. I haven't made a pie chart in a while, and in ggplot2 they aren't the simplest because you have to convert to a polar coordinate system.
+
+```{r}
+df <- data.frame(
+  group = c("Male", "Female", "Child"),
+  value = c(25, 25, 50)
+  )
+
+df %>% 
+  ggplot() + 
+  geom_bar(aes(x = '', y = value, fill = group),
+           width = 1, stat = 'identity') + 
+  coord_polar(theta = 'y')
+```
+
+Maybe I can leverage the original data, or the `threats` data set so I don't have to do a ton of data manipulation. 
+
+```{r}
+threats %>% 
+  ggplot() + 
+  geom_bar(aes(x = threatened, group = threat_type, fill = threat_type),
+           position = 'dodge') + 
+  scale_fill_viridis_d()
+```
+
+I'm happy with how this turned out -- it's what I asked for -- I'm just not sure how to get this into the right groups. 
+
+```{r}
+threats %>% 
+  ggplot() + 
+  geom_bar(aes(x = threatened, group = threat_type, fill = threat_type),
+           position = 'dodge') + 
+  scale_fill_viridis_d() + 
+  facet_wrap(vars(group))
+```
+
+Fine, but I need it to be relative. 
+
+```{r}
+threats %>% 
+  ggplot() + 
+  geom_bar(aes(x = threatened, y = ..prop.., group = threat_type, fill = threat_type),
+           position = 'dodge') + 
+  scale_fill_viridis_d() + 
+  facet_wrap(vars(group))
+```
+
+So, I guess this is getting warmer, but it's still not great. This data is going to be heavily faceted; I need something else to work with here. Maybe I should create my own dataset after all, so I know what I'm working with. It's a pretty bespoke graph, isn't it? 
+
+Each pie chart has two parts, proportion yes and proportion no. This is done for each plant group, and for each type of threat. 
+
+```{r}
+group_threats %>% 
+  mutate(c_pct_species = 1 - pct_species) %>% 
+  filter(threat == "aa") %>% 
+  pivot_longer(cols = c(pct_species, c_pct_species)) %>% 
+  ggplot() + 
+  geom_col(aes(x = threat, y = value, group = name, fill = name)) + 
+  facet_wrap(vars(threat, group))
+```
+Perfect. Let's see how polarizing goes. 
+
+```{r}
+group_threats %>% 
+  mutate(c_pct_species = 1 - pct_species) %>% 
+  filter(threat == "aa") %>% 
+  pivot_longer(cols = c(pct_species, c_pct_species)) %>% 
+  ggplot() + 
+  geom_col(aes(x = threat, y = value, group = name, fill = name)) + 
+  facet_wrap(vars(threat, group)) + 
+  coord_polar('y')
+```
+
+Beauty. Now, I restricted it to just the 'aa' threat (agriculture and aquaculture), because the banner is too large on each facet. Let me fix that by eliminating said banner. 
+
+```{r}
+group_threats_vis <- group_threats %>% 
+  mutate(c_pct_species = 1 - pct_species) %>% 
+  filter(threat %in% c('aa','bru','rcd')) %>% 
+  pivot_longer(cols = c(pct_species, c_pct_species)) %>% 
+  ggplot() + 
+  geom_col(aes(x = "", y = value, group = name, fill = name)) + 
+  facet_wrap(vars(threat, group)) + 
+  coord_polar('y')
+
+group_threats_vis + 
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_blank()
+  )
+  
+```
+
+This works at the cost of losing the names for things. But I already have fairly large problems, beause I want to reorganize the circles into groups based on group. Maybe I'll process them all separately. 
+
+```{r}
+group_threats %>% 
+  mutate(c_pct_species = 1 - pct_species) %>% 
+  pivot_longer(cols = c(pct_species, c_pct_species)) %>% 
+  ggplot() + 
+  geom_col(aes(x = "", y = value, group = name, fill = name)) + 
+  facet_grid(rows = vars(group), cols = vars(threat)) +
+  coord_polar('y') + 
+  theme(
+    strip.background = element_blank()
+  )
+
+```
+
+Okay, this is the basis on which I will base my final graphic. Boy, it's gonna take some doing. But it'll get there in no time. 
+
+
+# A day late, a dollar short
+It's now Wednesday, and I won't have much time to work on this until later tonight, but for now I can try to figure out how I want this to look. Certainly, I need to change the aspect ratio. In fact, for this portion, I'm going to move to an R file, so I have more control. 
+
+See `rfiles\extinct_plants.R`. 

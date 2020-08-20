@@ -1,7 +1,9 @@
 *.Rhistory
 *.RData
 *.pdf
-*.jpg
+sanfran/pdf/*.jpg
 *.Rproj.*
 *.csv
 .Rproj.user
+*.xcf
+
