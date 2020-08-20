@@ -1,7 +1,7 @@
 # Extinct Plants
 This project is in two parts. The first part, in `extinct_plants.Rmd`, explores the data and figures out the technique for the final visualization. The second part, `rfiles\extint_plants.R`, produces the graphic.
 
-![Extinct plants](/pdf/extinct_plants.jpg)
+![Extinct plants](extinct_plants/pdf/extinct_plants.jpg)
 
 This week, I wanted to move away from the crowd a little and look at plant groups (more or less divisions in this case) and how each group is affected by different environmental factors. It's a brief visualization, but interesting, I think.
 
