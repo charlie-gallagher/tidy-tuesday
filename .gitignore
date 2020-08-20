@@ -6,4 +6,4 @@ sanfran/pdf/*.jpg
 *.csv
 .Rproj.user
 *.xcf
-
+*.shp
