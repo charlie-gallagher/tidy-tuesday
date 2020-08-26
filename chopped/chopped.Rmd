@@ -1,0 +1,243 @@
+---
+title: "Chopped"
+output: 
+  html_notebook:
+    toc: TRUE
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(skimr)
+library(janitor)
+library(lubridate)
+```
+
+```{r}
+# Getting the data
+chop <- readr::read_tsv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-08-25/chopped.tsv')
+
+save(chop, file = 'data/chopped.RData')
+```
+
+# Introduction
+This week's data comes from the show 'Chopped'. The data dictionary: 
+
+|variable         |class     |description |
+|:----------------|:---------|:-----------|
+|season           |double    | Season Number |
+|season_episode   |double    | Episode number within a season |
+|series_episode   |double    | Episode number as part of the entire series |
+|episode_rating   |double    | IMDB sourced episode rating 0-10 scale |
+|episode_name     |character | Episode Name|
+|episode_notes    |character | Episode notes |
+|air_date         |character | Episode air date|
+|judge1           |character | Judge 1 Name|
+|judge2           |character | Judge 2 Name |
+|judge3           |character | Judge 3 Name |
+|appetizer        |character | Appetizer ingredients|
+|entree           |character | Entree ingredients|
+|dessert          |character | Dessert ingredients |
+|contestant1      |character | Contestant 1 name |
+|contestant1_info |character | Contestant 1 Info|
+|contestant2      |character | Contestant 2 name |
+|contestant2_info |character | Contestant 2 Info|
+|contestant3      |character | Contestant 3 name |
+|contestant3_info |character | Contestant 3 Info|
+|contestant4      |character | Contestant 4 name |
+|contestant4_info |character | Contestant 4 Info| 
+
+
+
+A quick skim: 
+
+```{r}
+chop %>% 
+  skimr::skim()
+```
+
+
+# Analysis
+I would like to parse the ingredients to make a list of ingredients by meal. Do the show makers prefer certain ingredients? Do the judges prefer certain ingredients? Let's work on that. I bet that's going to be a common direction, but it at least gives me some text work to do. 
+
+
+Before I commit, though, let's look at what's here. There are 568 episodes, each episode is an observation. Each episode has a rating, 3 judges, 4 contestants, and three meals (appetizer, dinner, dessert). There's also a variable for the date. There's metadata about each contestant. The rating comes from IMDb.
+
+Georgios Karamanis's graphic for this week is interesting: it shows the cut injuries in Chopped over time. First, how have there been 45 seasons? Second, do cutting injuries (or other types of injuries) correlate with ratings? Are there other things that contribute to ratings? Do ratings vary much? Let's look. 
+
+```{r}
+chop %>% 
+  ggplot() + 
+  geom_line(aes(x = series_episode, y = episode_rating)) + 
+  scale_y_continuous(limits = c(0,10))
+
+chop %>% 
+  ggplot() + 
+  geom_histogram(aes(episode_rating))
+```
+
+Yes, ratings vary quite a bit. It's not clear what drives ratings. Probably good contestants, good humor, raw, unmeasurable entertainment value. I could get a weak correlation at best. What I need are some patterns. 
+
+At the moment, I'm on a different tack. I'm reading the episode descriptions for potential things to mine. So far, the descriptions are mostly related to eliminations. I guess one could look at female vs. male eliminations with some basic natural language processing. I'm not that excited by that one, though. Sometimes, they have episodes called "Chopped Champions". Maybe these are better rated? 
+
+```{r}
+chop %>% 
+  mutate(
+    is_champions = grepl("((Chopped Champions)|(won past episodes))", episode_notes)
+  ) %>% 
+  group_by(is_champions) %>% 
+  summarize(
+    mean_rating = mean(episode_rating, na.rm = TRUE),
+    median_rating = median(episode_rating, na.rm = TRUE),
+    n = n()
+  )
+```
+
+So, I guess it worked. There's a very small sample size (only 11 episodes out of 579) of champions episodes. You might see how the relationship changes from season to season, but with 45-odd seasons it would be close to unintelligible. Let me do a similar thing for episodes where the contestant appeared in other shows. 
+
+Shows: 
+
+- Worst Cooks in America
+- Iron Chef
+- Beat Bobby Flay
+- Guy's Grocery Games
+
+Other things that might boost ratings include celebrities (how common?), number of words in the description as a proxy for number of interesting things that happened in that episode. 
+
+First, let's look at crossovers: 
+```{r}
+chop %>% 
+  mutate(
+    wcia = grepl('Worst Cooks in America', episode_notes),
+    ic = grepl('Iron Chef', episode_notes),
+    bbf = grepl('Beat Bobby Flay', episode_notes),
+    ggg = grepl("Guy's Grocery Games", episode_notes)
+  ) %>% 
+  select(episode_rating, wcia, ic, bbf, ggg) %>% 
+  pivot_longer(cols = c(wcia, ic, bbf, ggg), names_to = "crossover", values_to = "is_crossover") %>% 
+  group_by(crossover, is_crossover) %>% 
+  summarize(
+    mean_rating = mean(episode_rating, na.rm = TRUE),
+    median_rating = median(episode_rating, na.rm = TRUE),
+    n= n()
+  )
+```
+
+That was a failure. I must have seen the only crossovers there in the first few episodes, because there are only a dozen. Next up is celebrities. 
+
+```{r}
+chop %>% 
+  mutate(
+    has_celebrity = grepl("(C|c)elebrit(y|ies)", episode_notes)
+  ) %>% 
+  select(episode_rating, has_celebrity) %>% 
+  group_by(has_celebrity) %>% 
+  summarize(
+    mean_rating = mean(episode_rating, na.rm = TRUE),
+    median_rating = median(episode_rating, na.rm = TRUE),
+    n = n()
+  )
+```
+
+Again, not very many examples of this. Effectively no difference in ratings regardless. Let's just look at cuttings, because I know that data exists and I need to feel better. 
+
+```{r}
+chop %>% 
+  mutate(is_cut = grepl("\\bcut", episode_notes)) %>% 
+  tabyl(is_cut)
+```
+
+So, in fact, there are not many episodes with cuts either. This is actually reflected in Georgio's graphic, I just wasn't paying close attention. So, that makes me feel somewhat better about the numbers I was getting. Okay, let's now assume that more words in the description means a greater number of events, and see whether a greater number of events is associated with higher ratings. 
+
+```{r}
+chop %>% 
+  mutate(
+    n_char = nchar(episode_notes),
+    n_char_bin = cut(n_char, breaks = 20),
+    n_char_bin = forcats::fct_explicit_na(n_char_bin)
+  ) %>% 
+  group_by(n_char_bin) %>% 
+  summarize(
+    mean_rating = mean(episode_rating, na.rm = TRUE),
+    median_rating = median(episode_rating, na.rm = TRUE),
+    n = n()
+  ) %>% 
+  ggplot() +
+  geom_point(aes(x = n_char_bin, y = mean_rating, size = n))
+```
+
+I think there is a slight upward trend here, especially at the low end of the scale. Of course, the high end of the scale gets a bit fuzzy, but that's a sample size problem most likely. The graphic just isn't very interesting, I think. 
+
+
+
+What else? I'm getting tired of the ratings idea -- I would rather move towards trends, the evidence of other textual clues. What else do I have? Ingredients, but those probably don't recur often enough. Names, which aren't very useful without some sort of name library or something. 
+
+I may have an answer. The worst rated episode of the show was the episode "Worst Cooks Challenge", number 363. I can see the headline: Worst cooks, worst episodes. 
+
+```{r}
+chop %>% 
+  mutate(is_worst = episode_name == "Worst Cooks Challenge") %>% 
+  ggplot() + 
+  geom_boxplot(aes(y = episode_rating), width = 1) + 
+  scale_x_continuous(limits = c(-2,2))
+```
+Something like that could be interesting. But it's not a whole visualization. It doesn't present very much data -- it's a single data point that's kind of funny. I need a data story. 
+
+There are no particularly highly rated episodes. Could you make the argument that the people who rate the show are snobs? If they don't like bad chefs, maybe the top-rated episodes have a pattern as well. Worth a shot, anyway. 
+
+```{r}
+chop %>% 
+  filter(episode_rating == 9.2)
+```
+
+An old idea I had was to compile a list of ingredients. If I do that, I can look at the complete list of ingredients, but it will be a bit of a challenge retaining much of the associated data. Let me just make a list of ingredients with no metadata, as an exercise. The ingredients are all comma separated, and none is capitalized. 
+
+How should I process this? Pull each, concatenate into a single string (sep comma), split by comma. 
+
+```{r}
+foods <- list(
+  app = pull(chop, appetizer),
+  entree = pull(chop, entree),
+  dessert = pull(chop, dessert)
+  ) %>% 
+  map(function(x) paste(x, collapse = ", ")) %>% 
+  map(function(x) str_split(x, pattern = ", "))
+
+app = foods[[1]][[1]]
+entree = foods[[2]][[1]]
+dessert = foods[[3]][[1]]
+
+rm(foods)
+```
+
+Cool, that was surprisingly easy. But again, this is not a particularly interesting format. I guess I could still summarize each to see which ingredients appear more than once (if any). I'm not expecting very large numbers. 
+
+```{r}
+(n_duplicated <- c(
+  app = length(app[duplicated(app)]),
+  entree = length(entree[duplicated(entree)]),
+  dessert = length(dessert[duplicated(dessert)])
+))
+```
+
+A surprising number of ingredients have been repeated. How many times does each ingredient get used? Which are the most popular? This might not be as clean in base R as it is in the Tidyverse. I guess I could convert them quickly and then use `janitor::tabyl()`.
+
+```{r}
+tibble(app = app) %>% 
+  tabyl(app) %>% 
+  arrange(desc(n)) %>% 
+  head(n = 10)
+
+tibble(entree = entree) %>% 
+  tabyl(entree) %>% 
+  arrange(desc(n)) %>% 
+  head(n = 10)
+
+tibble(dessert = dessert) %>% 
+  tabyl(dessert) %>% 
+  arrange(desc(n)) %>% 
+  head(n = 10)
+```
+
+Now that's more like it. Graphic: show how many unique ingredients there are for each meal, followed by the top 5 ingredients by number of times eaten. I'll finish the thing tomorrow, but I want basic versions of the data tonight. 
+
+
