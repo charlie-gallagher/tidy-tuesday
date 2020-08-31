@@ -1,0 +1,116 @@
+---
+title: "Fonts"
+output: html_notebook
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(extrafont)
+```
+# Notes on `extrafont`
+"Fonts that are imported into `extrafont` can be used with PDF or PostScript output files." The two hurdles: 
+
+1. "Making R aware of the font and the dimensions of the characters"
+2. "Embedding the fonts in the PDF file so that the PDF can be displayed properly on a device that doesn't have the font." For example, printing. 
+
+I need to install Ghostscript. I also need to install the package `extrafontdb`, which has the font database. Finally, I need the package `Rttf2pt1`, which contains the ttf2pt1 program used to read and manipulate TrueType fonts. 
+
+I just installed Ghostscript, which is an interesting if complicated program that runs as a command line application. It seems it can view and manipulate PDF files. It's an interpreter for PostScript files. 
+
+Next, the two packages. Done. No issues there. 
+
+From the documentation: 
+
+> To use extrafont in making graphs, you'll need to do the following:
+
+> * Import fonts into the extrafont database. (Needs to be done once)
+* Register the fonts from the extrafont database with R's PDF (or PostScript) output device. (Needs to be done once per R session)
+* Create the graphics that use the fonts.
+* Embed the fonts into the PDF file. (Needs to be done for each file)
+
+```{r}
+library(extrafont)
+```
+
+__Import the Fonts__
+```{r}
+font_import()
+fonts()
+```
+
+Now I can see which fonts I have by using `fonts()`. 
+
+If I add new fonts, I will have to run `font_import()` again. According to the doc, it only works with TrueType fonts. TrueType is the font standard developed by Apple in the late 80's. It's the most common type of font format. 
+
+
+__Registering fonts with R__: This is done automatically when the package is loaded. The first time, though, I need to run it. 
+
+```{r}
+loadfonts()
+```
+
+Dopest dope. I won't need to run this again unless I re-import the fonts, I think. 
+
+
+Example: 
+
+```{r}
+cairo_pdf(file = "font_ggplot.pdf", width=10, height = 10)
+p <- ggplot(mtcars, aes(x=wt, y=mpg)) + geom_point() +
+  ggtitle("Fuel Efficiency of 32 Cars") +
+  xlab("Weight (x1000 lb)") + ylab("Miles per Gallon") + 
+  theme(text=element_text(size=24, family="Impact"))
+p
+
+dev.off()
+
+```
+
+Now I need to embed the fonts. 
+
+```{r}
+Sys.setenv(R_GSCMD = "C:/Program Files/gs/gs9.52/bin/gswin64c.exe")
+  # Sets the location of GhostScript. Needs to be done every session
+embed_fonts("font_ggplot.pdf", outfile="font_ggplot_embed.pdf")
+```
+
+NOTES: 
+
+- If you use the default PDF device, the fonts will not work. When viewed with Adobe Viewer, the fonts will not appear until you embed them, and once you've embedded them all characters will appear on top of each other. This is an unresolved issue, it seems. 
+- You can export to PNG without a problem.
+- To export to PDF, use the `cairo_pdf()` device. 
+
+Now, can I add a new font that I get from one of the font websites? I installed Abril Fatface from Google Fonts. Let's try it. 
+
+```{r}
+cairo_pdf(file = "font_ggplot.pdf", width=10, height = 10)
+p <- ggplot(mtcars, aes(x=wt, y=mpg)) + geom_point() +
+  ggtitle("Fuel Efficiency of 32 Cars") +
+  xlab("Weight (x1000 lb)") + ylab("Miles per Gallon") + 
+  theme(text=element_text(size=24, family="Abril Fatface"))
+p
+dev.off()
+embed_fonts("font_ggplot.pdf", outfile="font_ggplot_embed.pdf")
+```
+Success! However, it did not work for PNG, even though I re-registered the fonts. In the list of registered fonts it appeared, but for whatever reason it does not work for the built-in device like all the other fonts (all?).
+
+Also, good tip, use `ggrepel` to create text callouts that do not interfere with each other. 
+
+
+# Example session
+```{r}
+library(tidyverse)
+library(extrafont)
+
+Sys.setenv(R_GSCMD = "C:/Program Files/gs/gs9.52/bin/gswin64c.exe")
+loadfonts()
+
+
+# ...
+```
+
+
+Other things of note that don't have a home: 
+
+- `ggforce`
+- `ggalt`

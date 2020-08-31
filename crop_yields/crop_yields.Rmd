@@ -1,0 +1,238 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(skimr)
+library(lubridate)
+library(ggflags)
+```
+
+Goals for this week: 
+
+- Use a new geom from `ggalt`
+- Learn to use new fonts with the `extrafont` package
+- Stay completely within R? 
+- Maybe use `ggrepel` or `ggforce` for other things
+
+See `fonts.Rmd` in the Tidy Tuesday folder for how to implement fonts. 
+
+
+# Data
+The data is crop yields by country over the last few decades. 
+
+```{r}
+key_crop_yields <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-01/key_crop_yields.csv')
+fertilizer <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-01/cereal_crop_yield_vs_fertilizer_application.csv')
+tractors <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-01/cereal_yields_vs_tractor_inputs_in_agriculture.csv')
+land_use <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-01/land_use_vs_yield_change_in_cereal_production.csv')
+arable_land <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-01/arable_land_pin.csv')
+```
+
+Normally I'd copy the data dictionary, but it's formatting poorly for the purpose at the moment. The only solution is to simply use the one on the site. Anyway, let's look at things. There are five datasets: `key_crop_yields`, `fertilizer`, `tractors`, `land_use`, and `arable_land`. 
+
+`key_crop_yields`: Contains data on countries, continents, and regions. The unit of observation appears to be the geographic location and year. To get only countries, exclude rows where `is.na(code)` is true. For each country/year, there are observations for the crop yield, crops including things like wheat, rice, maize, and so on. The unit is tonnes per hectare, which means the data is already fairly relative. 
+
+`fertilizer`: Again, country/year is the unit of observation. The variables include cereal yield in tonnes per hectare and nitrogen fertilizer use in kilograms per hectare. 
+
+`tractors`: Same unit; variables are tractors per 100 sq km arable land, cereal yield in kg per hectare, and total population according to Gapminder. 
+
+`land_use`: Variables include cereal yield index, change to land area used for cereal production since 1961, and again total population via Gapminder. 
+
+`arable_land`: A single variable: arable land needed to produce a fixed quantity of crops (1.0 = 1961). 
+
+Since these datasets all have the same unit of observation, I can merge them if I want. But if I don't that's probably okay too. Let's  do some skimming. 
+
+
+
+```{r}
+key_crop_yields <- janitor::clean_names(key_crop_yields) %>% 
+  mutate(date = ymd(paste0(year, '-01-01')))
+fertilizer <- janitor::clean_names(fertilizer) %>% 
+  mutate(date = ymd(paste0(year, '-01-01')))
+land_use <- janitor::clean_names(land_use) %>% 
+  mutate(date = ymd(paste0(year, '-01-01')))
+tractors <- janitor::clean_names(tractors) %>% 
+  mutate(date = ymd(paste0(year, '-01-01')))
+arable_land <- janitor::clean_names(arable_land) %>% 
+  mutate(date = ymd(paste0(year, '-01-01')))
+
+
+crop_yields <- key_crop_yields %>% 
+  full_join(fertilizer, by = c('entity', 'code', 'date')) %>% 
+  full_join(land_use, by = c('entity', 'code', 'date')) %>% 
+  full_join(tractors, by = c('entity', 'code', 'date')) %>% 
+  full_join(arable_land, by = c('entity', 'code', 'date'))
+
+skimr::skim(crop_yields)
+
+```
+
+Merging didn't go poorly, but it didn't go well. Some of the years are given with a "BC" suffix, which presents obvious problems. This data is interesting, but I'm not sure how they calculated it. Consequently, most of the year variables can be ignored. I'm not sure how it handled year vairables when the value was NA.... I guess it merged no matter what because it was uniquely identified with a country and an NA, but that's not true is it. Whether or not it's useful to merge these remains to be seen. Probably it is not as useful as using them in their native forms. 
+
+
+# A Look into the Data
+Geography brings two graphics to mind: maps and flags. A classic is the lollipop where each lollipop is a round flag from `ggflags`. Agh... `ggflags` has to be installed from source, which doesn't work because of that stupid apostrophe in my file path. No flags then, I guess. I guess I could clone the repo on my dev account and compile it manually, like I do when I make my own packages. This is what I did. Let's see if it worked. 
+
+```{r}
+set.seed(1234)
+d <- data.frame(x=rnorm(50), y=rnorm(50), 
+                country=sample(c("ar","fr", "nz", "gb", "es", "ca"), 50, TRUE), 
+                stringsAsFactors = FALSE)
+ggplot(d, aes(x=x, y=y, country=country, size=x)) + 
+  geom_flag() + 
+  scale_country() +
+  scale_size(range = c(0, 15))
+```
+Ah great.  
+
+Anyway, that was only test code. I might also use the package `geofacet`, which presumably has a world facet? I'm not sure. Anyway, I could focus down on Europe or Asia, for example, if I'm more interested in somewhere besides the U.S. (and I am). 
+
+As another experiment, let's create a lollipop of the crop yield of wheat for each country in the EU.  
+
+```{r}
+eu2 <- c('at','be','bg','cy','cz','de','dk','ee','es',
+         'fi','fr','gr','hr','hu','ie','it','lt','lu',
+         'lv','mt','nl','pl','pt','ro','se','si','sk')
+
+eu3 <- c('aut','bel','bgr','cyp','cze','deu','dnk', 'est',
+        'esp','fin','fra','grc','hrv','hun','irl','ita','ltu',
+        'lux','lva','mlt','nld','pol','prt','rou','swe','svn','svk')
+
+mean_hectares <- key_crop_yields %>% 
+  mutate(code = tolower(code)) %>% 
+  filter(code %in% eu3, year == 2018) %>% 
+  mutate(mean_hectares = mean(wheat_tonnes_per_hectare, na.rm = TRUE)) %>% 
+  pull(mean_hectares)
+
+mean_hectares <- unique(mean_hectares)
+
+key_crop_yields %>% 
+  mutate(code = tolower(code)) %>% 
+  filter(code %in% eu3, year == 2018) %>% 
+  mutate(
+    flag_code = eu2,
+    above_mean = wheat_tonnes_per_hectare >= mean_hectares
+    ) %>% 
+  ggplot() + 
+  geom_vline(xintercept = mean_hectares) + 
+  geom_segment(aes(x = wheat_tonnes_per_hectare, xend = mean_hectares,
+                   y = reorder(entity, wheat_tonnes_per_hectare),  yend = entity,
+                   color = above_mean), size = 1) + 
+  scale_color_manual(values = c('red','#1da616')) + 
+  geom_flag(aes(x = wheat_tonnes_per_hectare, y = entity, country = flag_code)) + 
+  ggthemes::theme_few()
+
+```
+
+So nice... I think the lollipop is not suited as well to static data. It's better at showing a positive or negative change over time. I could make a well-informed decision about two years to difference for each country. First, let me make a general-use EU dataset. 
+
+```{r}
+eu3 <- c('aut','bel','bgr','cyp','cze','deu','dnk', 'est',
+        'esp','fin','fra','grc','hrv','hun','irl','ita','ltu',
+        'lux','lva','mlt','nld','pol','prt','rou','swe','svn','svk')
+
+eu2 <- tibble(
+  eu2 = c('at','be','bg','cy','cz','de','dk','ee','es',
+         'fi','fr','gr','hr','hu','ie','it','lt','lu',
+         'lv','mt','nl','pl','pt','ro','se','si','sk'),
+  eu3 = eu3
+)
+
+crop_eu <- key_crop_yields %>% 
+  mutate(code = tolower(code)) %>% 
+  filter(code %in% eu3) %>% 
+  left_join(eu2, by = c('code' = 'eu3')) %>% 
+  select(country = entity, eu3 = code, eu2, year, date, everything())
+
+rm(list = c('eu2','eu3'))
+
+crop_eu
+```
+
+So, they all produce barley, and they all produce wheat, and nearly all produce peas. Now, let's make the same plot but plot the difference in hectares from 2008 to 2018, which is just an arbitrary decade right now. 
+
+```{r}
+crop_eu_diff <- crop_eu %>% 
+  filter(date %in% c(ymd('2018-01-01','2008-01-01'))) %>% 
+  group_by(eu2) %>% 
+  mutate(
+    wheat_diff = wheat_tonnes_per_hectare - lag(wheat_tonnes_per_hectare)
+  ) %>% 
+  filter(date == ymd('2018-01-01')) %>% 
+  ungroup() %>% 
+  select(country, eu3, eu2, date, wheat_tonnes_per_hectare, wheat_diff)
+
+crop_eu_diff %>% 
+  mutate(above_zero = wheat_diff > 0) %>% 
+  ggplot() + 
+  geom_vline(xintercept = 0) + 
+  geom_segment(aes(x = wheat_diff, xend = 0,
+                   y = reorder(country, wheat_diff), yend = country,
+                   color = above_zero)) + 
+  geom_flag(aes(x = wheat_diff, y = country, country = eu2)) + 
+  scale_color_manual(values = c('red','#1da616')) 
+```
+
+Pretty cool. I wonder if the line of intersection should be the mean or zero. Probably zero, since it's more intuitive. Would it be too much to do this for all countries? Yes, but only because of the codes. Let me see if I can find something and merge it in. 
+
+Here's something. 
+
+```{r}
+country_codes <- readr::read_csv('https://raw.githubusercontent.com/datasets/country-codes/master/data/country-codes.csv') %>% 
+  janitor::clean_names()
+
+country_codes <- country_codes %>% 
+  select(alpha3 = iso3166_1_alpha_3, alpha2 = iso3166_1_alpha_2, 
+         region = sub_region_name, sub_region_code, developed = developed_developing_countries)
+```
+The codes I have are the `alpha3` codes, and I need the `alpha2` codes merged in. By the way, this data comes from [here](https://raw.githubusercontent.com/datasets/country-codes/master/data/country-codes.csv). Love it. Anyway, let me see how this works now. 
+
+```{r}
+world_wheat_diff <- key_crop_yields %>% 
+  left_join(country_codes, by = c('code' = 'alpha3')) %>% 
+  filter(date %in% c(ymd('2018-01-01','2008-01-01'))) %>% 
+  group_by(code) %>% 
+  mutate(
+    wheat_diff = wheat_tonnes_per_hectare - lag(wheat_tonnes_per_hectare)
+  ) %>% 
+  filter(date == ymd('2018-01-01'), !is.na(code)) %>% 
+  ungroup() %>% 
+  select(entity, code, alpha2, date, wheat_tonnes_per_hectare, wheat_diff,
+         region, sub_region_code, developed)
+
+world_wheat_diff_gg <- world_wheat_diff %>% 
+  filter(sub_region_code %in% c(155, 39, 21, 151),
+         !is.na(wheat_tonnes_per_hectare)) %>% 
+  mutate(above_zero = wheat_diff > 0,
+         entity = toupper(entity)) %>% 
+  ggplot() + 
+  geom_vline(xintercept = 0) + 
+  geom_segment(aes(x = wheat_diff, xend = 0,
+                   y = reorder(entity, wheat_diff), yend = entity,
+                   color = above_zero), size = 1) + 
+  geom_flag(aes(x = wheat_diff, y = entity, country = tolower(alpha2)),
+            size = 10) + 
+  scale_color_manual(values = c('red','#1da616')) +
+  scale_x_continuous(name = "Difference in Wheat Production per Year (Tonnes per Hectare)") + 
+  guides(color = FALSE) + 
+  theme_minimal() + 
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = 'dotted', color = grey(0.7),
+                                      size = 0.5),
+    axis.title.y = element_blank(),
+    axis.text.y = element_text(size = 10),
+    axis.text.x = element_text(size = 10),
+    axis.title.x = element_text(size = 10)
+  )
+
+ggsave(filename = 'crop_diff.pdf', plot = world_wheat_diff_gg, height = 8,
+       width = 11)
+
+```
+
+In a good bit of luck, the country code dataset also has sub-region information, which I'm using to make this graphic with no trouble at all. 
