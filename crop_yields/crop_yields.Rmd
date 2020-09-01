@@ -216,7 +216,7 @@ world_wheat_diff_gg <- world_wheat_diff %>%
   geom_flag(aes(x = wheat_diff, y = entity, country = tolower(alpha2)),
             size = 10) + 
   scale_color_manual(values = c('red','#1da616')) +
-  scale_x_continuous(name = "Difference in Wheat Production per Year (Tonnes per Hectare)") + 
+  scale_x_continuous(name = "Difference in Annual Wheat Production 2008-2018 (Tonnes per Hectare)") + 
   guides(color = FALSE) + 
   theme_minimal() + 
   theme(
@@ -236,3 +236,166 @@ ggsave(filename = 'crop_diff.pdf', plot = world_wheat_diff_gg, height = 8,
 ```
 
 In a good bit of luck, the country code dataset also has sub-region information, which I'm using to make this graphic with no trouble at all. 
+
+# Ideas for Graphic
+I think the change in wheat yield is interesting but arbitrary. Who cares how much wheat production changed from 2008 to 2018, or any other interval? If I can find a compelling reason to take the difference, maybe I can really use the flag lollipop plot, but barring that I need a different idea. 
+
+I think an economic approach would make sense given the subject matter, but I don't have time to research anything. The only thing I remember about crop yields actually has to do with crop trading and purchasing power parity. In that case, let's look again at the variables. Each dataset is self-explanatory and fairly simple; there is no text to extract and analyze, the values are there in front of me. Then, I will probably get the most out of this dataset by including a lot of relevant data into a simple graphic. 
+
+What graphic can accommodate a lot of data? Global-scale geofacets, maps in general, and maps would show that I'm capable of generating good map graphics and working with map data. Customization with maps is such a pain, though. I could do a very long timeline, wherein I show the trends over time of several key variables.
+
+Radical idea: Show land use by filling in a fraction of the country's shape with a color. That would be somewhat hard., but with SF probably possible. However, reading it would be impossible without something more than just fill. Probably, I would turn each into a two-tone country, one tone representing land used, the other representing land not used. This becomes very tricky for a number of reasons, though. First, land use is an index of land used in `year` versus land used in 1960. This makes it unlikely that most countries would show an increase or a decrease over time. Second, the actual creation of the graphic could take weeks. The way I see it, you need to split each country into separate polygons, and I don't think this could be done (a) precisely or (b) automatically. In other words, you would be stuck estimating by hand and editing the polygons by hand. Not good. And how would you fill vertical countries like Norway, Chile, or Italy? Left to right? Top to bottom? It's unfortunately not a good idea. 
+
+In fact, someone's done this with the U.S.! See [this reddit post](https://www.reddit.com/r/dataisbeautiful/comments/ijyn7p/oc_us_population_deciles_by_latitude_and_longitude/). 
+
+Back to trends over time. Or fun iconography: tractors per 100 sq km, visualized with little tractors. But I think everyone will have that idea. Maybe the only way forward is to limit my scope, visualize some variables, and see if anything stands out. 
+
+I just looked through the "Our World in Data" page; they have visualized a lot of this data and more, usually in line charts and with maps. For that reason, line charts and maps are out this week. I think it would be interesting to explore the relationship between tractors per 100 sq km arable land and cereal yield. That relationship might be tenuous, though, even if it makes sense. I wonder, though, whether there's a trade-off between plant diversity and agriculture in a country over a long time horizon. Too many factors. So many of these factors seem hopelessly complicated, to the point where their correlations seem meaningless. 
+
+Points about each dataset: 
+
+- Time is continuous, and will probably have a role in each.
+- Any differences over time (e.g. 2008 vs 2018) will be arbitrary, unless they connect to some event. 
+- Most of the non-time variables (cereal yield, crop yield, tractors, etc.) are sporadic over time and do not always show clear trends. 
+- The data is composed of over 200 countries, plus land masses like Asia, the Americas, etc. 
+
+To handle the high variability of most of the data, I could use means, medians, moving averages, bins, or other means of smoothing. But what about countries? I have two real options: show a subset or all of the countries, or use a single country as a case study. A case study country will have to be somehow interesting or related to me and relevant to other people. I could also compare two countries as a case study. If I knew more about development economics, I might be able to compare socialist/communist/fascist/capitalist yields. Accurate data is available only after 1960 or so. I could look at the delay in the effects of technology by comparing innovative countries like the U.K. and the U.S. to developing countries. I have developing country data, too, so I can look at the differences in the curves between developed countries and developing countries. Let me look into this. 
+
+
+```{r}
+key_crop_yields %>% 
+  left_join(country_codes, by = c('code' = 'alpha3')) %>% 
+  filter(date > ymd('1900-01-01'), !is.na(code)) %>% 
+  select(entity, code, alpha2, date, wheat_tonnes_per_hectare,
+         region, sub_region_code, developed) %>% 
+  group_by(developed, date) %>% 
+  summarize(mean_wheat = mean(wheat_tonnes_per_hectare, na.rm = TRUE)) %>% 
+  ggplot() + 
+  geom_line(aes(x = date, y = mean_wheat, group = developed, linetype = developed))
+```
+
+Another idea is a different lollipop chart, one like this: 
+
+![alttext](https://github.com/hrbrmstr/ggalt/raw/master/README_figs/README-dumbbell-1.png)
+
+In this case, it would be a selection of countries (some from developed world, others from developing) and for each I show the 1960 and 2018 value of whatever variable I choose. Let me try this with wheat. 
+
+```{r}
+crop_eu_diff <- key_crop_yields %>% 
+  left_join(country_codes, by = c('code' = 'alpha3')) %>% 
+  filter(date %in% c(ymd('1961-01-01'), ymd('2018-01-01')), !is.na(code)) %>% 
+  select(entity, code, alpha2, date, wheat_tonnes_per_hectare,
+         sub_region_code, developed) %>% 
+  filter(developed == "Developed",
+         !is.na(wheat_tonnes_per_hectare)) %>% 
+  pivot_wider(id_cols = c(entity, code, alpha2, sub_region_code), 
+              values_from = wheat_tonnes_per_hectare,
+              names_from = date,
+              names_prefix = "wheat_"
+              ) %>% 
+  rename(wheat_1961 = `wheat_1961-01-01`,
+         wheat_2018 = `wheat_2018-01-01`) %>% 
+  filter(!is.na(wheat_1961))
+
+
+mean_wheat <- crop_eu_diff %>% 
+  pivot_longer(cols = c(wheat_1961, wheat_2018), names_to = "year", values_to = "wheat") %>% 
+  group_by(entity) %>% 
+  mutate(mean_wheat = mean(wheat, na.rm = TRUE)) %>% 
+  pull(mean_wheat) %>% 
+  unique()
+
+crop_eu_diff %>% 
+  ggplot() + 
+  geom_segment(aes(x = wheat_1961, xend = wheat_2018, 
+                   y = reorder(entity, -mean_wheat), yend = entity),
+               color = "#dbc1ac", size = 2, alpha = 0.6) +
+  geom_flag(mapping = aes(x = wheat_1961, y = entity, country = tolower(alpha2))) + 
+  geom_flag(mapping = aes(x = wheat_2018, y = entity, country = tolower(alpha2))) + 
+  labs(title = "Change in Wheat Production, 1961-2018",
+       subtitle = 
+       "Annual wheat production has increased for all countries since 1961. In particular\nthe countries with the largest increases were often those with the largest surface\nareas. Lorem ipsum dolor sit, quae dolit meorum quae est.") + 
+  theme_minimal() + 
+  theme(
+    text = element_text(family = 'serif', color = "#dbcbbd"),
+    plot.background = element_rect(fill = "#3E3232"),
+    plot.title = element_text(size = 20),
+    plot.subtitle = element_text(size = 10),
+    panel.background = element_rect(fill = '#3E3232', color = NA),
+    panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = 'dotted', color = "#dbcbbd",
+                                      size = 0.5),
+    axis.title.y = element_blank(),
+    axis.text.y = element_text(size = 10, color = "#dbcbbd"),
+    axis.text.x = element_text(size = 10, color = "#dbcbbd"),
+    axis.title.x = element_text(size = 10)
+  )
+  
+  
+```
+
+This theme more or less comes from [scheme color](https://www.schemecolor.com/golden-coffee.php). I'm going to settle on this graphic, because I need to get *something* done. 
+
+Now, the graphic works well if you use developed countries, so I'm wondering how developing countries will do. Hopefully enough of them will be removed that I can safely plot them all. 
+
+```{r, fig.height = 15, fig.width=7}
+crop_eu_diff <- key_crop_yields %>% 
+  left_join(country_codes, by = c('code' = 'alpha3')) %>% 
+  filter(date %in% c(ymd('1961-01-01'), ymd('2018-01-01')), !is.na(code)) %>% 
+  select(entity, code, alpha2, date, wheat_tonnes_per_hectare,
+         sub_region_code, developed) %>% 
+  filter(!is.na(wheat_tonnes_per_hectare)) %>% 
+  pivot_wider(id_cols = c(entity, code, alpha2, sub_region_code, developed), 
+              values_from = wheat_tonnes_per_hectare,
+              names_from = date
+              ) %>% 
+  rename(wheat_1961 = `1961-01-01`,
+         wheat_2018 = `2018-01-01`) %>% 
+  filter(!is.na(wheat_1961))
+
+
+
+mean_wheat <- crop_eu_diff %>% 
+  pivot_longer(cols = c(wheat_1961, wheat_2018), names_to = "year", values_to = "wheat") %>% 
+  group_by(entity) %>% 
+  mutate(mean_wheat = mean(wheat, na.rm = TRUE),
+         mean_wheat = case_when(developed == "Developed" ~ mean_wheat * 10,
+                                developed == "Developing" ~ mean_wheat)) %>% 
+  pull(mean_wheat)
+mean_wheat <- mean_wheat[seq(1, 184, 2)]
+
+
+
+crop_eu_diff %>% 
+  ggplot() + 
+  geom_segment(aes(x = wheat_1961, xend = wheat_2018, 
+                   y = reorder(entity, -mean_wheat), yend = entity),
+               color = "#dbc1ac", size = 2, alpha = 0.6) +
+  geom_flag(mapping = aes(x = wheat_1961, y = entity, country = tolower(alpha2))) + 
+  geom_flag(mapping = aes(x = wheat_2018, y = entity, country = tolower(alpha2))) + 
+  labs(title = "Change in Wheat Production, 1961-2018",
+       subtitle = 
+       "Annual wheat production has increased for all countries since 1961. In particular\nthe countries with the largest increases were often those with the largest surface\nareas. Lorem ipsum dolor sit, quae dolit meorum quae est.") + 
+  theme_minimal() + 
+  theme(
+    text = element_text(family = 'serif', color = "#dbcbbd"),
+    plot.background = element_rect(fill = "#3E3232"),
+    plot.title = element_text(size = 20),
+    plot.subtitle = element_text(size = 10),
+    panel.background = element_rect(fill = '#3E3232', color = NA),
+    panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = 'dotted', color = "#dbcbbd",
+                                      size = 0.5),
+    axis.title.y = element_blank(),
+    axis.text.y = element_text(size = 10, color = "#dbcbbd"),
+    axis.text.x = element_text(size = 10, color = "#dbcbbd"),
+    axis.title.x = element_text(size = 10)
+  )
+```
+
+As a final modification, I should probably use relative differences rather than absolute differences. But is that justified here? It's interesting to see the different absolute values as well. It gives you a sense of scale and difference between developed and developing countries. 
+
