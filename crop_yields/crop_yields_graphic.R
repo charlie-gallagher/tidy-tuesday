@@ -65,6 +65,7 @@ crop_diff %>%
   geom_flag(mapping = aes(x = wheat_1961, y = entity, country = tolower(alpha2))) + 
   geom_flag(mapping = aes(x = wheat_2018, y = entity, country = tolower(alpha2))) + 
   scale_x_continuous(name = "Wheat Production (Tonnes per Hectare)") +
+  guides(color = FALSE) + 
   theme_minimal() + 
   theme(
     text = element_text(family = 'Arapey', color = "#dbcbbd"),

@@ -1,0 +1,351 @@
+---
+title: "Friends"
+output: html_notebook
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(friends)
+library(skimr)
+library(cowplot)
+```
+
+This data from the `friends` package. There is data on the Tidy Tuesday website, so I'm not sure if I should look there too or what. I'll look through the package first. 
+
+```{r}
+f_emotions <- friends::friends_emotions
+f_entities <- friends::friends_entities
+f_info <- friends::friends_info
+f <- friends::friends
+```
+
+Strictly it's not necessary to assign these to the global environment, but it makes it easier to see them and remember their names and variables. Let's skim. 
+
+### Friends
+
+```{r}
+skimr::skim(f)
+
+```
+
+This dataset has speaker and text as the unit of observation. Then, there's the metadata (season, episode, scene) and the utterance number. I don't know what utterance number is. It maxes out around 255, but it seems like most values are less than 25. I think utterances 
+
+
+### Emotions
+```{r}
+skimr::skim(f_emotions)
+```
+
+Similar to the `f` dataset. Season, episode, scene, and utterance identify the observations, and each utterance is given one of seven emotions. It might be interesting to look at the accuracy of different sentiment analyses. 
+
+
+### Entities
+```{r}
+skimr::skim(f_info)
+```
+
+Metadata about each episode. Observations are identified by the season and episode, or by the air date. 
+
+
+### Info
+```{r}
+skimr::skim(f_entities)
+```
+
+Similar structure to `f` again, identified by the season, episode, scene, and utterance. Entities are 'character entities'. Usually, this is just characters present in the scene, maybe those characters who have lines? Anyway, I can join these, can't I? It seems like I couldn't. Must be some tricky things with the data. 
+
+# Ideas and Inspirations
+This is probably going to be a text analysis, and most likely one that views many episodes in seasons over time. I could also aggregate at several levels. There's a commonly used graphic popularized by either Ced Scherer or Giorgio K. 
+
+## Packages
+I want to use the `cowplot` package by Claus Wilke. It can make really nice graphics, with titles at the margins and multiple graphics and images in the plots. In other words, it's a one-stop-shop for making publication-ready graphics with ggplot. Here's a test graphic with a small PNG I made a second ago. 
+
+```{r}
+library(cowplot)
+df <- tibble(
+  x = rnorm(n = 10),
+  y = rnorm(n = 10)
+)
+
+logo <- c("C:/users/Charlie's surface/pictures/test_sprite.png")
+
+p <- ggplot(data = df) + 
+  geom_point(aes(x = x, y = y))
+
+p1 <- ggdraw(plot = p) + 
+  draw_image(image = logo, 
+             width = 0.25, height = 0.25, x = 0.5, y = 0.5,
+             hjust = 0.5, vjust = 0.5)
+
+plot_grid(p, p1, rel_widths = c(1,1))
+
+rm(list = c('df','p','p1','logo'))
+
+```
+
+Neato. I'm a little concerned that the right graph is smaller than the left one, but I suppose this could be an optical illusion as well. Aha it is an optical illusion, but a powerful one. Why is the margin so small on the right side? Can I adjust the graphic's margins? No, not that I can see. 
+
+Now, I really like [this graphic](https://twitter.com/MaryCrossland1/status/1303415957642260482) by [@MaryCrossland1](https://twitter.com/MaryCrossland1). It uses `cowplot` in a beautiful manner, and the styling is just great. 
+
+## Ideas for visualization directions
+It's late, so I'm not sure where I'll end up. Let's generate some questions. To recap, I have four datasets. The first three (`f`, `f_emotions`, and `f_entities`) have the same basic structure where each observation is an utterance in a scene, episode, and season. The data I have for each line is the line and who said it (`f`), who was present (`f_entities`), and what feeling they were emoting (`f_emotions`). Then I have the `f_info` dataset, which has metadata for each episode: season, episode, title, director, writer, air date, views in the US, and IMDb rating. This non-textual data is easier to work with, but it isn't as interesting, and it doesn't showcase any text analysis skills I've developed. With that in mind, I'm going to stick to the first three datasets and use the fourth if I need any extra data. Alternatively, I could related words to writers, or explore which writers favored which characters. In fact, that's interesting enough. Let me see how that goes. 
+
+```{r}
+f_info %>% 
+  janitor::tabyl(written_by) %>% 
+  arrange(desc(n))
+```
+
+This presents a challenge: how do I get just the names I want? There are sometimes two writers, and I'm guessing that one wrote the story the other the teleplay -- who is more important for the share of the lines? Let's just assume I can parse this (it won't be hard with look-aheads and look-behinds) and that I am able to make a convincing argument for one or the other. What might the graphic look like? There are many writers and many characters. I often see graphics about who is talking to who (character connections), but I'm not sure how those are made. It seems like it will be temperamental with R. Let me see anyway. 
+
+Tip from one user: there are scene directions included as speakers, so it's best to filter them out. 
+
+I could do a long graphic again, one in which I generate a ranking of the speakers with the most lines in each episode for each writer and facet by writer. In other words, I would show each writer's character preference profile as bars. 
+
+What this data might look like is relational data, rather than a regular rectangular data frame. [@loreabad6](https://twitter.com/loreabad6) used `tidygraph` and `ggraph` to manage her relational visualization (found [here](https://twitter.com/loreabad6/status/1303652202662289410)). It's an attractive graphic, and I'm really interested in relational data like this. I don't know if I'll have time to properly understand it, though, which makes me worried. 
+
+
+Well, it's Thursday now. I've been learning about fonts, collecting some ideas, and thinking briefly about colors. 
+
+
+# Graphic parts
+I'm going to have two graphs. The first will be a long facet in which each writer's favorite character is given via the share of lines given to each character. The second will be an area chart in which the number of lines given to each character forms the total lines per episode. The second graphic is easier to make, so I'll start there. 
+
+I need the individual, the number of lines by episode. 
+
+
+```{r}
+f %>% 
+  filter(speaker %in% c('Monica Geller','Joey Tribbiani','Chandler Bing','Phoebe Buffay')) %>% 
+  group_by(season, episode, speaker) %>% 
+  summarize(n_lines = n()) %>% 
+  left_join(f_info, by = c('episode','season')) %>% 
+  filter(air_date < lubridate::ymd('1996-01-01')) %>% 
+  group_by(season, episode) %>% 
+  mutate(
+    total_lines = sum(n_lines),
+    share_lines = n_lines / total_lines,
+    unity = sum(share_lines)
+  ) %>% 
+  ggplot() + 
+  geom_area(aes(x = air_date, y = share_lines, group = speaker, fill = speaker)) + 
+  scale_x_date(date_breaks = "1 month")
+```
+
+This is fine. In 1995, there was a double-feature, giving the unusual bars at that point. I can make an indicator for such double-features and work with them. I could also use season-episode as the x-axis and avoid the whole thing. Let me do that instead. 
+
+```{r}
+f %>% 
+  filter(speaker %in% c('Monica Geller','Joey Tribbiani','Chandler Bing','Phoebe Buffay')) %>% 
+  group_by(season, episode, speaker) %>% 
+  summarize(n_lines = n()) %>% 
+  left_join(f_info, by = c('episode','season')) %>% 
+  group_by(season, episode) %>% 
+  mutate(
+    total_lines = sum(n_lines),
+    share_lines = n_lines / total_lines,
+    unity = sum(share_lines)
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    seas_epi = factor(paste(season, episode, sep = '-'), ordered = TRUE)
+  ) %>% 
+  ggplot() + 
+  geom_area(aes(x = seas_epi, y = share_lines, group = speaker, fill = speaker)) +
+  scale_fill_manual(values = c('#fff7a2','#ffb400','#f32423','#00bcff')) + 
+  scale_y_continuous(expand = c(0,0))
+```
+
+This is very noisy, but that's okay, because friends share. Ach. Anyway, it's an ordered factor, and as long as the data doesn't change that's correctly ordered. Anyway, let's consider this done. 
+
+The next graphic is more difficult. I have to decide how to parse the writers for each episode. Probaby, I will have a different variable for each writer's name, which I will pivot and facet by. It's real ugly, but it could work. Before I jump into that, though, I want to compile a list of the writers. 
+
+Patterns: 
+
+- Story by: [name]Teleplay by: [name]
+- [name] & [name] & etc.
+- [name]
+
+To parse this, I'm going to first separate pattern one, then pattern two (which will catch pattern ones which have the pattern "Story by: [name] & [name]", for example). This should leave me with something close to pattern 3. 
+
+
+```{r}
+writers_all <- f_info %>% 
+  pull(written_by) %>% 
+  unique() %>% 
+  str_replace(" ", "")
+
+# Extract from phrases "Story by" and "Teleplay by"
+storyby <- stringr::str_extract(writers_all, "(?<=Story by: ).*(?=Teleplay)")
+storyby <- storyby[!is.na(storyby)]
+teleplayby <- stringr::str_extract(writers_all, "(?<=Teleplay by: ).*")
+teleplayby <- teleplayby[!is.na(teleplayby)]
+
+# Recombine and clean up
+writers <- unique(c(writers[!grepl("Teleplay", writers)], storyby, teleplayby))
+writers_split <- stringr::str_split(writers, " & ") %>% do.call(c, args = .) %>% unique()
+
+# Still need to fix some names; will do this by hand
+writers_split[c(17, 27, 33, 37, 38, 42, 48)] <- NA
+writers_split <- c(writers_split, "Mike Sikowitz","Michael Borkow",
+                   "Jill Condon","Amy Toomin",
+                   "Andrew Reich","Gregory S. Malins",
+                   "Adam Chase","David Crane",
+                   "Scott Silveri","Andrew Reich",
+                   "Gregory S. Malins","Marta Kauffman",
+                   "Scott Silveri","Marta Kauffman")
+
+writers <- writers_split[!is.na(writers_split)] %>% unique()
+```
+
+Okay, so that was as painful as I expected it to be but not bad. I don't know what symbol was between "Story by" and the colon, but it's essential it's kept. A period did not function as a replacement. 
+
+Anyway, now that I have a list of all 51 writers that have been on the show, I can try to get the data I'm interested in. First, who are the writers who wrote most often for the show? Hopefully there is a small group, because 51 bar charts is not aesthetically nice. 
+
+Which writers work most often on the show? To answer this, I can split the strings as best I can, make them a matrix, and use `cbind` to put them back into the dataset with simple variable names: writer one, writer two, etc. for as many as I need. 
+
+```{r}
+writers_all <- f_info %>% 
+  pull(written_by) %>% 
+  str_replace(" ", "") %>% # unusual symbol after "Story by"
+  str_replace(" ", "") # unusual symbol after "Teleplay by"
+# I don't know what this symbol is, but it's always there
+
+# Replace 
+writers <- str_replace_all(writers_all, "Story by: ", "")
+writers <- str_replace_all(writers, "Teleplay by:", " & ")
+
+# Sometimes, names are written "First LastFirst Last". This expression 
+# gets rid of those. A simpler expression could split McCarthy by mistake
+writers <- str_replace_all(writers, "([a-z]{2})([A-Z][a-z])",
+                           "\\1 & \\2") 
+writers <- str_replace_all(writers, "Jill Condon\n& Amy Toomin",
+                           "Jill Condon & Amy Toomin")
+
+# Convert to df and add to a new dataset
+writers_df <- str_split(writers, "\\s*&\\s*", simplify = TRUE) %>% as.data.frame()
+names(writers_df) <- c('first_writer','second_writer','third_writer',
+                       'fourth_writer','fifth_writer')
+
+f_info_writers_wide <- cbind(f_info, writers_df) %>% as_tibble()
+f_info_writers <- cbind(f_info, writers_df) %>% as_tibble() %>% 
+  pivot_longer(cols = c('first_writer','second_writer',
+                        'third_writer','fourth_writer',
+                        'fifth_writer'),
+               names_to = c('writer_number'),
+               values_to = c('writer_name'))
+
+# Summarize
+top_20_writers <- f_info_writers %>% 
+  group_by(writer_name) %>% 
+  summarize(n_episode = n()) %>% 
+  arrange(desc(n_episode)) %>% 
+  filter(writer_name != "") %>% 
+  slice_head(n = 20) %>% 
+  pull(writer_name)
+
+
+```
+
+I made a list (`top_20_writers`) containing the top 20 writers. Now, there's another interesting graphic I could make, and that's how often the show added new writers. This would be pretty interesting, but a nightmare to construct. Hm. For each of the five writers, I would need to add a column saying whether or not it was their first appearance as a writer. Actually, I could do this after I pivot long. Then, cumulative sum of the writers over time. 
+
+```{r}
+f_info_writers %>% 
+  mutate(is_new_writer = !duplicated(writer_name)) %>% 
+  group_by(air_date) %>% 
+  summarize(is_new_writer = sum(is_new_writer)) %>% 
+  mutate(cum_is_new_writer = cumsum(is_new_writer)) %>% 
+  ggplot() + 
+  geom_line(aes(x = air_date, y = cum_is_new_writer)) + 
+  geom_smooth(aes(x = air_date, y = cum_is_new_writer), se = FALSE)
+```
+
+Ah cool! I'm glad that worked. Also, it does seem like the rate of adding people slowed down over time. I can also look at number of writers per episode to see if that has any trends. 
+
+```{r}
+f_info_writers %>% 
+  filter(writer_name != "") %>% 
+  group_by(season, episode) %>% 
+  summarize(n = n()) %>% 
+  ungroup() %>% 
+  mutate(id = row_number()) %>% 
+  ggplot() + geom_line(aes(x = id, y = n))
+```
+
+Nothing there, unfortunately. Now, I made this dataset so I could look at the preferences of different writers. That should be just a quick merge into `f`. 
+
+```{r, fig.height = 20, fig.width=8}
+friends <- c('Chandler Bing','Ross Geller','Monica Geller','Rachel Green',
+             'Joey Tribbiani','Phoebe Buffay')
+
+f_writers <- f %>% 
+  left_join(f_info_writers_wide, by = c('season','episode')) %>% 
+  pivot_longer(cols = c('first_writer','second_writer',
+                        'third_writer','fourth_writer',
+                        'fifth_writer'),
+               names_to = c('writer_number'),
+               values_to = c('writer_name')) %>% 
+  filter(writer_name != "", speaker %in% friends) %>% 
+  group_by(writer_name, speaker) %>% 
+  summarize(n_lines = n()) %>% 
+  arrange(writer_name, desc(n_lines))
+
+# Generating variables based on line number
+rank_values <- c('#2c696c', rep('#a38481', 4), '#a22e24')
+
+f_writers %>% 
+  group_by(writer_name) %>% 
+  mutate(sum_lines = sum(n_lines, na.rm = TRUE),
+         pct_lines = n_lines / sum_lines,
+         rank = rank(n_lines, ties.method = 'first')) %>% 
+  filter(writer_name %in% top_20_writers) %>% 
+  ggplot() + 
+  geom_col(aes(x = speaker, y = pct_lines, 
+               fill = factor(rank, labels = c('Sixth','Fifth','Fourth','Third','Second','First')))) + 
+  facet_grid(rows = vars(writer_name)) + 
+  scale_y_continuous(expand = c(0,0)) + 
+  scale_fill_manual(values = rank_values, name = "Rank") + 
+  ggthemes::theme_clean()
+```
+
+I love this. Is Joey always attributed "Joey Tribbiani," for example? I believe so, yes. Will spot check. Anyway the graphic is hard to read because you're comparing rankings, but I'm giving you relative percentages. It would be clearer if you could see plain rankings, I think. 
+
+```{r, fig.height = 20, fig.width=5}
+rank_values <- c(rep('#a38481', 6), '#a22e24')
+
+f_writers %>% 
+  group_by(writer_name) %>% 
+  mutate(
+    rank = rank(n_lines)
+  ) %>% 
+  filter(writer_name %in% top_20_writers) %>% 
+  ggplot() + 
+  geom_col(aes(x = speaker, y = rank, fill = factor(rank))) + 
+  facet_grid(rows = vars(writer_name)) + 
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = rank_values) + 
+  ggthemes::theme_clean()
+```
+
+This didn't work well. The ranking throws off the y-axis Here's a radical idea: What about a bump chart where each x-axis point is a writer? How would I write the x-axis on that? I think it could work if I could get the line to connect from writer to writer. The problem with this is that it attempts to draw a comparison across the writers, but the order of the writers is in fact arbitrary. So, nix this idea. 
+
+I settled on this: use the share of lines, but use the ranking as the color scheme. That way I can highlight who was most popular and who was least popular. Let's wrap this up, then. 
+
+
+
+There's a sort of hypothesis about lone writers: do lone writers get higher ratings? How is the number of writers related to the IMBd rating of the show? 
+
+```{r}
+f_info_writers %>% 
+  filter(writer_name != "") %>% 
+  group_by(season, episode) %>% 
+  summarize(n = n(),
+            rating = mean(imdb_rating, na.rm = TRUE)) %>% 
+  ggplot() + 
+  geom_smooth(aes(x = n, y = rating)) + 
+  geom_point(aes(x = n, y = rating), position = 'jitter')
+
+```
+
+It's a messy fit, but it does fit. And it's totally flat. 
+
