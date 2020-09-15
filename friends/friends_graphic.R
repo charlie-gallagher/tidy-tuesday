@@ -6,7 +6,6 @@ library(cowplot)
 
 # Fonts
 loadfonts(device = 'win')
-loadfonts(device = 'postscript')
 
 # Import data
 f_emotions <- friends::friends_emotions
@@ -75,7 +74,7 @@ writers_all <- f_info %>%
 
 # Replace 
 writers <- str_replace_all(writers_all, "Story by: ", "")
-writers <- str_replace_all(writers, "Teleplay by:", " & ")
+writers <- str_replace_all(writers, "Teleplay by: ", " & ")
 
 # Sometimes, names are written "First LastFirst Last". This expression 
 # gets rid of those. A simpler expression could split McCarthy by mistake
