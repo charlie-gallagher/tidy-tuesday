@@ -71,6 +71,3 @@ svg(filename = 'tidykids.svg', width = 12, height = 6)
 ggkids_p
 dev.off()
 
-ggkids_p
-
-
