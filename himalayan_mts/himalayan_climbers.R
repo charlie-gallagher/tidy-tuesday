@@ -66,7 +66,8 @@ p <- exp %>%
              color = grey(0.9), size = 1.5) + 
   labs(
     title = "EVEREST EXPEDITIONS",
-    subtitle = "Journeys to the top of the world end for many reasons. This graphic\nlooks at the results of all Everest expeditions since 1921.\nEverest has had a colorful history, but even\nstill most expeditions reach the peak."
+    subtitle = "Journeys to the top of the world end for many reasons. This graphic\nlooks at the results of all Everest expeditions since 1921.\nEverest has had a colorful history, but even\nstill most expeditions reach the peak.",
+    caption = "Source: The Himalayan Database  |  Visualization: Charlie Gallagher"
   ) + 
   scale_x_continuous(expand = c(0,0)) + 
   scale_y_continuous(name = "Number of Expeditions", expand = c(0,0)) + 
@@ -86,11 +87,12 @@ p <- exp %>%
     legend.position = c(0.24, 0.92),
     panel.grid = element_blank(),
     panel.grid.major.y = element_line(color = "#252f39ff"),
-    plot.margin = margin(20, 40, 20, 40),
+    plot.margin = margin(20, 40, 5, 40),
     plot.title.position = "panel",
     plot.title = element_text(margin = margin(0,0,0,0)),
     plot.subtitle = element_text(family = "Roboto Lt", 
                                  size = 12, margin = margin(0,0,20,0)),
+    plot.caption = element_text(family = "Roboto", size = 8, color = grey(0.4)),
     axis.title.y = element_text(family = "Roboto Lt", size = 10,
                                 color = grey(0.9)),
     axis.title.x = element_blank(),
