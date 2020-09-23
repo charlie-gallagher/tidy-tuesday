@@ -88,6 +88,7 @@ p <- exp %>%
     panel.grid = element_blank(),
     panel.grid.major.y = element_line(color = "#252f39ff"),
     plot.margin = margin(20, 40, 5, 40),
+    plot.background = element_rect(color = NA),
     plot.title.position = "panel",
     plot.title = element_text(margin = margin(0,0,0,0)),
     plot.subtitle = element_text(family = "Roboto Lt", 
