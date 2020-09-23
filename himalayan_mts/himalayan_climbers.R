@@ -67,7 +67,7 @@ p <- exp %>%
   labs(
     title = "EVEREST EXPEDITIONS",
     subtitle = "Journeys to the top of the world end for many reasons. This graphic\nlooks at the results of all Everest expeditions since 1921.\nEverest has had a colorful history, but even\nstill most expeditions reach the peak.",
-    caption = "Source: The Himalayan Database  |  Visualization: Charlie Gallagher"
+    caption = "Source: The Himalayan Database  |  Visualization: @charliegallaghr"
   ) + 
   scale_x_continuous(expand = c(0,0)) + 
   scale_y_continuous(name = "Number of Expeditions", expand = c(0,0)) + 
