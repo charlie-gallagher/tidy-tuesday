@@ -1,0 +1,175 @@
+---
+title: "Himalayan Climbers"
+output: html_notebook
+---
+
+This week's Tidy Tuesday data comes from a dataset of 10,000 Himalayan expeditions called "The Himalayan Database". It's a "compilation of records for all expeditions that have climbed in the Nepal Himalaya." Without any further delay, the data: 
+
+```{r,include=FALSE}
+library(tidyverse)
+```
+
+
+```{r}
+members <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-22/members.csv')
+expeditions <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-22/expeditions.csv')
+peaks <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-22/peaks.csv')
+```
+
+There are three data sets: 
+
+- `peaks`
+  - Variables include a peak id, name, alternative name, height, climbing status, and information about the first ascent expedition. 
+- `members`
+  - Includes ID variables for expedition, member, and peak, as well as data about the expedition and its participants. Other interesting variables in this one, like whether the person used oxygen or not. 
+- `expeditions`
+  - ID for expedition and peak, then data about each expedition like dates, staff, and members. Also, agency and whether oxygen was used. Oh, also a high point for that expedition and a reason for termination.
+
+
+# Data ideas
+What do I want to say about the data? What do I want to describe? Of course I would do well to avoid Everest, or maybe just compare Everest to the other mountains. I'm interested in which of the Himalayan peaks has resisted climbers' attempts. One idea: a bump chart showing a ranking of success rates. What would that look like? 
+
+There are 468 peaks, but not all have been attempted which will lighten the load a little. Okay, the data looks like madness. 
+
+Data: expeditions
+
+
+```{r}
+expeditions %>% 
+  mutate(
+    success = termination_reason %in% c('Success (claimed)', 
+                                        'Success (main peak)',
+                                        'Success (subpeak)')
+  ) %>% 
+  group_by(peak_id, year) %>% 
+  summarize(
+    n = n(),
+    n_success = sum(success),
+    pct_success = n_success / n
+  ) %>% 
+  mutate(
+    everest = peak_id == 'EVER'
+  ) %>% 
+  ggplot() +
+  geom_line(aes(x = year, y = n, group = peak_id, color = everest))
+```
+
+
+Well that's not too offensive to look at. It might also be interesting to look at a stacked area chart of this same data. I think it would really drive home how many more expeditions are being attempted. But I'll come back to that. First, what if I took only the 25-50 more commonly climbed peaks? 
+
+```{r}
+most_common_peaks <- expeditions %>% 
+  group_by(peak_id) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  top_n(25) %>% 
+  pull(peak_id)
+
+
+
+expeditions %>% 
+  filter(peak_id %in% most_common_peaks) %>% 
+  mutate(
+    success = termination_reason %in% c('Success (claimed)', 
+                                        'Success (main peak)',
+                                        'Success (subpeak)')
+  ) %>% 
+  group_by(peak_id, year) %>% 
+  summarize(
+    n = n(),
+    n_success = sum(success),
+    pct_success = n_success / n
+  ) %>% 
+  mutate(
+    everest = peak_id == 'EVER'
+  ) %>%
+  filter(everest) %>% 
+  ggplot() +
+  geom_ribbon(aes(x = year, ymin = n_success, ymax = n), fill = 'purple')
+```
+
+This would be better as bars, wouldn't it? I think so. Not lollipops, because they would look too disjoint. I want bars with a minimum and a maximum. It would really be like a step plot but filled in. Ah, I know. I can use lines that are very thick. 
+
+```{r}
+expeditions %>% 
+  filter(peak_id %in% most_common_peaks) %>% 
+  mutate(
+    success = termination_reason %in% c('Success (claimed)', 
+                                        'Success (main peak)',
+                                        'Success (subpeak)')
+  ) %>% 
+  group_by(peak_id, year) %>% 
+  summarize(
+    n = n(),
+    n_success = sum(success),
+    pct_success = n_success / n
+  ) %>% 
+  mutate(
+    everest = peak_id == 'EVER',
+    diff = n - n_success
+  ) %>%
+  filter(everest) %>% 
+  ggplot() +
+  geom_segment(aes(x = year + 0.5, xend = year + 0.5, 
+                   y = n_success, yend = n, color = diff), 
+               size = 2) + 
+  scale_color_continuous(type = 'viridis') + 
+  scale_y_continuous(expand = c(0,0))
+```
+
+This is definitely going in the final visualization; it looks so good. And it has the interesting data points in 2014 and 2015 (Sherpa disaster?). So, in 2014 the sherpas died, and in 2015 there was an earthquake. The few who climbed in 2014 did so after the accident. Let's look at the top 5 most climbed peaks. 
+
+
+```{r}
+most_common_peaks <- expeditions %>% 
+  group_by(peak_id) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  top_n(5) %>% 
+  pull(peak_id)
+
+expeditions %>% 
+  filter(peak_id %in% most_common_peaks) %>% 
+  mutate(
+    success = termination_reason %in% c('Success (claimed)', 
+                                        'Success (main peak)',
+                                        'Success (subpeak)')
+  ) %>% 
+  group_by(peak_id, year) %>% 
+  summarize(
+    n = n(),
+    n_success = sum(success),
+    pct_success = n_success / n
+  ) %>% 
+  mutate(
+    everest = peak_id == 'EVER',
+    diff = n - n_success
+  ) %>%
+  ggplot() +
+  geom_segment(aes(x = year + 0.5, xend = year + 0.5, 
+                   y = n_success, yend = n, color = diff), 
+               size = 2) + 
+  facet_wrap(vars(peak_id), nrow = 1) + 
+  scale_color_continuous(type = 'viridis') + 
+  scale_y_continuous(expand = c(0,0)) + 
+  scale_x_continuous(limits = c(1975, 2020))
+```
+
+
+Not the prettiest, but I like how mountainous the data looks.
+
+I'm also interested in a slightly related version, based on [this awesome graphic](https://github.com/ysamano/TidyTuesday/tree/master/2020/week_24). With this data, I could make a few summary categories for the reasons the expedition was terminated, then look at causes for Everest. That would probably do a better job actually, compared to the one I have here. 
+
+```{r}
+expeditions %>% 
+  filter(peak_id == "EVER") %>% 
+  arrange(year, termination_reason) %>% 
+  mutate(id = row_number()) %>% 
+  ggplot() + 
+  geom_bar(aes(x = year, group = id, fill = factor(termination_reason)),
+           color = grey(0.9))
+  # scale_fill_discrete(guide = guide_legend(direction = "horizontal", nrow = 3)) + 
+  # theme(legend.position = c(0.3, 0.9),
+  #       plot.margin = margin(50, 0, 0, 0))
+```
+
