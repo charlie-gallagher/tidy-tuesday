@@ -27,13 +27,14 @@ p <- charts_clean %>%
   ggplot() + 
   geom_col(aes(x = reorder(title,released_date), y = chart_position, 
                fill = reorder(title, released_date))) + 
-  labs(title = "Taylor Swift's Album Rankings",
+  labs(title = "Taylor Swift Album Peak Rankings",
        subtitle = "Over her eight albums, Taylor has earned a global audience.",
        caption = "Data: Rosie Baillie and Dr. Sara Stoudt  |  Visualization: @charliegallaghr") + 
   facet_wrap(vars(chart), ncol = 2) + 
   scale_fill_manual(name = "ALBUMS (Chronological Order)", 
                     values = rep("#fff1aaff", 8)) + 
-  scale_y_reverse(breaks = c(0, 20, 40, 60, 80)) + 
+  scale_y_reverse(name = "Peak\nAlbum\nRanking",
+                  breaks = c(1, 20, 40, 60, 80)) + 
   guides(fill = guide_legend(
     direction = 'horizontal',
     title.position = 'top',
@@ -64,7 +65,12 @@ p <- charts_clean %>%
                                       size = 1),
     panel.spacing.x = unit(20, units = 'pt'),
     panel.spacing.y = unit(30, units = 'pt'),
-    axis.text.y = element_text(color = "#97e1ebff", margin = margin(5, 5, 5, 5)),
+    axis.title.y = element_text(color = "#97e1ebff", 
+                                margin = margin(0, 0, 5, 0),
+                                hjust = 1,
+                                vjust = 1),
+    axis.text.y = element_text(color = "#97e1ebff", 
+                               margin = margin(5, 5, 5, 5)),
     strip.text = element_text(color = '#fccad6ff', 
                               family = 'Roboto Bk', face = 'bold', 
                               size = 12),
