@@ -46,7 +46,7 @@ p <- charts_clean %>%
   theme_void() + 
   theme(
     plot.background = element_rect(fill = "#54cddeff", color = NA),
-    plot.margin = margin(10, 20, 10, 10),
+    plot.margin = margin(10, 50, 10, 10),
     plot.title = element_text(family = 'Oswald SemiBold', face = 'bold',
                               color = "#fff1aaff",
                               size = 25,
