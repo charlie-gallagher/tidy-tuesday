@@ -1,10 +1,16 @@
 # Tidy Tuesday
-[Tidy Tuesday](https://github.com/rfordatascience/tidytuesday) is "a weekly data project aimed at the R ecosystem." In this folder I add my own contributions, or half-contributions if I don't make a graphic. Sometimes I just explore the data for practice; other times I follow up with a nice visualization.
+[Tidy Tuesday](https://github.com/rfordatascience/tidytuesday) is "a weekly data project aimed at the R ecosystem." I store my own contributions in this repo. All my contributions can also be seen on my twitter: [@charliegallaghr](https://twitter.com/CharlieGallaghr). 
 
 Published visualizations:
 
 - NFL
 - Extinct plants
+- Chopped
+- Wheat Yields
+- Friends
+- State spending on libraries
+- Everest
+- Taylor Swift
 
 Projects potentially worth perusing:
 
