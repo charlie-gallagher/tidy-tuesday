@@ -1,0 +1,90 @@
+---
+title: "Taylor Swift"
+output: html_notebook
+---
+
+This week's data: Taylor Swift. 
+
+```{r,include=FALSE}
+library(tidyverse)
+```
+
+### Get the data
+```{r}
+beyonce_lyrics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-29/beyonce_lyrics.csv')
+taylor_swift_lyrics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-29/taylor_swift_lyrics.csv')
+sales <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-29/sales.csv')
+charts <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-09-29/charts.csv')
+```
+
+It looks like there are four datasets. (1) Beyonce lyrics, (2) Taylor Swift lyrics, (3) sales, and (4) charts.
+
+I don't have any particular inspiration for this graphic. I don't like sentiment analysis of lyrics because the sentiment is heavily weighted towards songs with more (and more repetitive) lyrics. There are a host of problems with sentiment analysis that I don't know how to solve, too. What about negations? Does 'not happy' count as positive, negative, or neutral? I'm just not good enough at natural language processing yet. 
+
+So, barring that I have to stick with a simpler linguistic analysis, or something that integrates other data. Let's get a feeling for the other data sets. 
+
+```{r}
+charts %>% 
+  skimr::skim()
+```
+
+So, these are all characters right now, but I think chart_position is just a normal ranking. Let me see if I can clean it up at all. Convert date variables to date-time format. For ranking, replace "—" with "". 
+
+
+```{r}
+charts_clean <- charts %>% 
+  mutate(
+    chart_position = as.integer(gsub("—", "", chart_position)),
+    released_date = gsub(" \\(US\\)\\[51\\]", "", released),
+    released_date = gsub("June 23, 2003 \\(UK\\)\\[39\\]", 
+                    "June 23, 2003", released_date),
+    released_date = lubridate::mdy(released_date)
+  ) %>% 
+  select(artist, title, released, released_date, everything())
+```
+
+The unit of observation here is the artist/album/country. How can I visualize this, then? See notebook, first page. 
+
+```{r}
+charts_clean %>% 
+  filter(artist == "Taylor Swift") %>% 
+  ggplot() + 
+  geom_col(aes(x = reorder(title,released_date), y = chart_position, fill = reorder(title, released_date))) + 
+  facet_wrap(vars(chart)) + 
+  scale_y_reverse() + 
+  theme_void() + 
+  theme(
+    panel.grid.major.y = element_line(color = grey(0.9), linetype = 'solid')
+  )
+```
+
+I really like this actually. I think this might be a good rough design. There's one other type of graphic I want to explore, having to do with concentric circles. But that graphic is better suited to segmented populations where you want to show each data point inside a circle. It's also not clear how I would put each data point in its circle... Probably with a polar coordinate system, then it shouldn't be too hard. Okay, I won't use it, but for the experiment I'll generate a usable dataset. 
+
+Alternatively, I could put each point into a circle where the size of the circle is mapped to the population of the country. But what points would go in each circle? Agh. But it's an interesting idea. I want to explore it further. 
+
+
+```{r}
+df <- data.frame(
+  x = runif(n = 50, min = 0, max = 1),
+  y = runif(n = 50, min = 1, max = 10)
+) %>% 
+  mutate(
+    group = case_when(
+      y <= 6 ~ 'one',
+      y > 6 & y <= 9 ~ 'two',
+      y > 9 ~ 'three'
+      ),
+    group = factor(group)
+    )
+
+df %>% 
+  ggplot() + geom_point(aes(x = x, y=y, color = group)) + 
+  coord_polar() + 
+  scale_y_continuous(breaks = c(6, 9, 10)) + 
+  theme_void() + 
+  theme(
+    panel.grid.major.y = element_line(color = grey(0.8), linetype = 'solid')
+  )
+  
+```
+
