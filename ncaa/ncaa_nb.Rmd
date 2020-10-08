@@ -1,0 +1,58 @@
+---
+title: "WBNA"
+output: html_notebook
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(janitor)
+library(skimr)
+```
+
+```{r}
+tournament <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-10-06/tournament.csv')
+
+skimr::skim(tournament)
+```
+
+
+I have an idea for this graphic. I want to recreate the graphic from Shirley Wu and Nadieh Bremer. Find it [here](https://www.theguardian.com/us-news/ng-interactive/2017/dec/20/bussed-out-america-moves-homeless-people-country-study). 
+
+
+I want to plot one point for every school/year combination. That's 2,092 points in all, which should look interesting. Maybe too many, though. I will restrict it to the top 5 seeds. This should be fine, because there are the same number of observations for each seed. Also, I'm only plotting winners, which will severely restrict my numbers. 
+
+Maybe I can do this: circle is highest tournament level, color is seed.
+
+From the documentation:
+OR=opening-round loss (1983 only); 1st=first-round loss; 2nd=second-round loss; RSF=loss in the Sweet 16; RF=loss in the Elite Eight; NSF=loss in the national semifinals; N2nd=national runner-up; Champ=national champions
+
+This could work well. 
+
+```{r}
+tournament %>% 
+  tabyl(tourney_finish)
+
+tournament %>% 
+  mutate(
+    tournament_level = case_when(
+      tourney_finish == "1st" ~ 7,
+      tourney_finish == "2nd" ~ 6,
+      tourney_finish == "RSF" ~ 5,
+      tourney_finish == "RF" ~ 4,
+      tourney_finish == "NSF" ~ 3,
+      tourney_finish == "N2nd" ~ 2,
+      tourney_finish == "Champ" ~ 1
+    )
+  ) %>% 
+  ggplot() + 
+  geom_point(aes(x = 1, y = tournament_level, color = factor(tournament_level)), 
+             position = position_jitter()) + 
+  scale_y_continuous(breaks = seq(1.5, 7.5, 1)) +
+  coord_polar() +
+  theme_void() + 
+  theme(
+    panel.grid.major.y = element_line(color = gray(0.7))
+  )
+```
+
+Now, 16 colors is too many, so I have to reduce it somehow. I could break it down into groups, group it by threes and a four. 
