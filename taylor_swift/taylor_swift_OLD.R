@@ -25,23 +25,24 @@ charts_clean <- charts %>%
 
 p <- charts_clean %>% 
   ggplot() + 
-  # Point-lines
-  geom_line(aes(x = reorder(title, released_date), y = chart_position, group = chart),
-            color = "white", size = 1) +
-  geom_point(aes(x = title, y = chart_position),
-             color = 'white') + 
-  # Text only for the first facet
-  geom_text(data = filter(charts_clean, chart == "AUSTRALIA"), 
-            aes(x = title, y = chart_position, label = title),
-            angle = 90, hjust = 1, color = 'white', nudge_y = -5,
-            family = 'Roboto Bk', size = 3) +
-  facet_wrap(vars(chart), ncol = 2) +
-  # Appearances
+  geom_col(aes(x = reorder(title,released_date), y = chart_position, 
+               fill = reorder(title, released_date))) + 
   labs(title = "Taylor Swift Album Peak Rankings",
        subtitle = "Over her eight albums, Taylor has earned a global audience.",
        caption = "Data: Rosie Baillie and Dr. Sara Stoudt  |  Visualization: @charliegallaghr") + 
+  facet_wrap(vars(chart), ncol = 2) + 
+  scale_fill_manual(name = "ALBUMS (Chronological Order)", 
+                    values = rep("#fff1aaff", 8)) + 
   scale_y_reverse(name = "Peak\nAlbum\nRanking",
                   breaks = c(1, 20, 40, 60, 80)) + 
+  guides(fill = guide_legend(
+    direction = 'horizontal',
+    title.position = 'top',
+    label.position = 'top',
+    label.hjust = 0.5,
+    nrow = 1,
+    keywidth = 3
+  )) + 
   theme_void() + 
   theme(
     plot.background = element_rect(fill = "#54cddeff", color = NA),
@@ -53,8 +54,7 @@ p <- charts_clean %>%
     plot.subtitle = element_text(family = 'Roboto Lt',
                                  color = "#fff1aaff",
                                  size = 12,
-                                 hjust = 0.5,
-                                 margin = margin(0, 0, 20, 0)),
+                                 hjust = 0.5),
     plot.caption = element_text(family = "Roboto Bk",
                                 color = "#97e1ebff",
                                 size = 8,
@@ -73,7 +73,13 @@ p <- charts_clean %>%
                                margin = margin(5, 5, 5, 5)),
     strip.text = element_text(color = '#fccad6ff', 
                               family = 'Roboto Bk', face = 'bold', 
-                              size = 12)
+                              size = 12),
+    legend.position = 'top',
+    legend.text = element_text(family = 'Roboto Bk', color = "#97e1ebff",
+                               size = 8),
+    legend.title = element_text(family = 'Roboto Bk', color = "#fccad6ff",
+                                margin = margin(0,0,0,0)),
+    legend.margin = margin(15, 0, 30, 0)
   )
 
 svg(filename = 'taylor_swift.svg', width = 7, height = 11)
