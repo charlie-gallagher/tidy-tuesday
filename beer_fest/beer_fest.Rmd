@@ -1,0 +1,72 @@
+---
+title: "Great American Beer Festival"
+output: html_notebook
+---
+
+```{r setup}
+library(tidyverse)
+library(skimr)
+library(janitor)
+```
+
+
+```{r}
+beer <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-10-20/beer_awards.csv')
+
+skimr::skim(beer)
+```
+
+Simple dataset this week, which is good because I'm getting a late start on it. Beer we go. 
+
+Five-thousand observations, each observation is a beer/year. Variables include medal (gold, silver, bronze), name, brewery, city, state, and category. There are 515 categories of beer, which is interesting. Which categories win the most? The least? 
+
+```{r}
+beer %>% 
+  mutate(
+    gold = medal == "Gold",
+    silver = medal == "Silver",
+    bronze = medal == "Bronze"
+  ) %>% 
+  group_by(category) %>% 
+  summarize(
+    n_gold = sum(gold),
+    n_silver = sum(silver),
+    n_bronze = sum(bronze),
+    n_medals = sum(gold + silver + bronze)
+  ) %>%
+  arrange(n_medals)
+    
+```
+
+That wasn't as interesting as I hoped it would be. Turns out its methodological nonsense. I wish they included taste profiles with these like they did with the coffee rankings. Anyway, I don't have an immediate idea of what visual I'd like to create this week. I'm thinking something black and white, like that one person on Twitter. Also, [this](https://github.com/gkaramanis/tidytuesday/blob/master/2020-week08/food-consumption.R) is a great bit a code from Georgios Karamanis. Pretty unbelievable actually, I'm really impressed. 
+
+So, B/W with a red highlight is probably the direction I'm going to go. That could highlight California, but I also might track changes over time with a long bump chart. Let's look at that. 
+
+How will I rank and group? Maybe not a bump chart, but cumulative medals over time for each state. That would be a step chart. 
+
+```{r}
+beer %>% 
+  mutate(
+    gold = medal == "Gold",
+    silver = medal == "Silver",
+    bronze = medal == "Bronze"
+  ) %>%
+  group_by(year, state) %>% 
+  summarize(
+    n_medals = sum(gold + silver + bronze)
+  ) %>% 
+  group_by(state) %>% 
+  mutate(
+    cum_medals = cumsum(n_medals),
+    pa = state == "WI"
+  ) %>% 
+  # filter(year == 2020) %>% 
+  # arrange(desc(cum_medals))
+  ggplot() + 
+  geom_step(aes(x = year, y = cum_medals, group = state, color = pa)) +
+  scale_color_manual(values = c(grey(0.6),'black')) + 
+  theme_void()
+```
+
+Well, it's not as good as the Navratilova graphic from last year, but I still like it. Let's run with it. Which state is the one that's flagging at the end? Ah, Wisconsin. Poor Wisconsin. Is there a possible reason for their loss of momentum? Impossible to say with this dataset, of course. Anyway, let's start finishing this graphic. 
+
