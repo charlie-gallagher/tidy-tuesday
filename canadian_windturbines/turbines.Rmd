@@ -1,0 +1,221 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r setup}
+library(tidyverse)
+library(sf)
+library(rnaturalearth)
+```
+
+
+```{r}
+turbine <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-10-27/wind-turbine.csv')
+```
+
+
+
+Let's get started. The data is on Canadian wind turbines. I haven't mapped data in a while, so that's something I'd like to do. I don't know much about Canada's geography, so that'll take some getting used to. Still, shouldn't be hard to get a basic plot. Where to get the Canada map data in SF format? Probably can get something from `rnaturalearth`.
+
+```{r}
+canada <- rnaturalearth::ne_countries(country = "canada", 
+                                      scale = "medium") %>% 
+  as("sf")
+
+plot(st_geometry(canada), graticule = TRUE, axes = TRUE)
+```
+
+Okay, it's not the best map; it lacks political borders. Still, it's a good start. Let's merge some stuff in. To do that, I need to convert 'turbine' to an `sf` object. 
+
+```{r}
+names(turbine)
+```
+
+`longitude` and `latitude` are points, so I need to convert them to a list of sf_POINT objects. 
+
+```{r}
+longlat <- vector(mode = 'list')
+
+for (i in seq(length(long))) {
+  longlat[[i]] <- st_point(
+    c(turbine$longitude[i], turbine$latitude[i])
+  )
+}
+
+turbine_sf <- turbine %>% 
+  mutate(longlat = st_sfc(longlat)) %>% 
+  st_sf(crs = 4326)
+
+rm(list = c('longlat', 'i'))
+
+```
+
+Let's see how it looks. 
+
+```{r}
+plot(st_geometry(canada))
+plot(st_geometry(turbine_sf), add = TRUE)
+```
+
+Nice. Let's move to `ggplot2` and fix up the margins, make it look nice. 
+
+```{r}
+ggplot() + 
+  geom_sf(data = canada) + 
+  geom_sf(data = turbine_sf)
+```
+
+Looking nice, but the projection could be better. It's so high, is all, and would be better served with a rounder projection. I don't know much about these projections. 
+
+```{r}
+st_is_longlat(turbine_sf)
+st_is_longlat(canada)
+```
+
+Both of these are unprojected except for their default projections. I can try to set my own re-projection of Canada, even though I'm not sure what's required. 
+
+```{r}
+canada_t <- canada %>% 
+  st_transform(3573)
+turbine_sf_t <- turbine_sf %>% 
+  st_transform(3573)
+
+ggplot() +
+  geom_sf(data = canada_t, fill = 'black') + 
+  geom_sf(data = turbine_sf_t, color = 'red') + 
+  theme_minimal()
+```
+
+Okay, something I should've known but didn't is that when you have a simple point geometry, you can use `sf::st_as_sf(data, coords = c("x","y"))` to convert to an SF object in one line. The more you know. Let's look at this data over time. 
+
+
+
+Some notes from my work in progress for this week: 
+
+```{r}
+# Before I go animate every point, let's do some tests
+df <- data.frame(
+  x = c(1, 2, 3, 4, 5, 6, 7),
+  y = c(5, 3, 5, 7, 9, 0, 9),
+  xy_group = c(2010, 2010, 2015, 2015, 2015, 2015, 2019)
+)
+
+p1 <- df %>% 
+  ggplot() + 
+  geom_point(aes(x = x, y = y, group = xy_group)) + 
+  transition_states(xy_group) + 
+  exit_shrink()
+animate(
+    p1, nframes = 20
+  )
+
+
+# Trickier is to make the data points permanent when they appear. This involves
+# changing the data. I need to fill in the data, each observation with every
+# year. Then I can give a 1 or a 0 if the turbine has been built already.
+
+# Candidate functions: tidyr::complete (which is basically tidyr::expand
+#                      expand.grid
+
+# First, what exactly do I want the dataset to look like? 
+df <- data.frame(
+  x = c(1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7),
+  y = c(5, 5, 5, 3, 3, 3, 5, 5, 7, 7, 9, 9, 0, 0, 9),
+  xy_group = c(2010, 2015, 2019, 2010, 2015, 2019, 2015, 2019, 2015, 2019, 2015, 2019, 2015, 2019, 2019)
+)
+
+# This won't solve the transition problem, though. Tricky. Aha, the answer is
+# transition_reveal
+
+df <- data.frame(
+  x = c(1, 2, 3, 4, 5, 6, 7),
+  y = c(5, 3, 5, 7, 9, 0, 9),
+  xy_group = c(2010, 2010, 2015, 2015, 2015, 2015, 2019)
+)
+
+p1 <- df %>% 
+  ggplot() + 
+  geom_point(aes(x = x, y = y, group = seq_along(xy_group))) + 
+  transition_reveal(seq_along(xy_group))
+animate(
+  p1, nframes = 21
+)
+
+# In the case of time, gganimate has several options
+p1 <- df %>% 
+  ggplot() + 
+  geom_point(aes(x = x, y = y, group = xy_group)) + 
+  transition_time(xy_group)
+
+animate(
+  p1, nframes = 21
+)
+
+# This is ideal, I think
+p1 <- df %>% 
+  ggplot() + 
+  geom_point(aes(x = x, y = y), size = 4) + 
+  transition_events(start = xy_group,
+                    end = xy_group,
+                    enter_length = 0,
+                    exit_length = 5) + 
+  exit_shrink()
+
+animate(
+  p1, nframes = 50
+)
+```
+
+
+
+
+# Number of turbines within 50 miles as color
+The key here is st_within, or something similar. I know I worked with these on the plant projects, so I can check there if I forget how it all works. 
+
+The binary operations all return a sparse matrix by default. I need to simply get the number of other points within a certain distance. 
+
+```{r}
+distance <- st_distance(turbine_t)
+```
+
+This is what I needed, but it's large (6698x6698, 358 MB). That's okay, I suppose. Let me use a small version for now, so I can troubleshoot things. 
+
+```{r}
+turbine_subset <- turbine_t %>% 
+  dplyr::slice_head(n = 10)
+
+distance <- st_distance(turbine_subset)
+
+n_within_800m <- apply(distance, 2, function(x) sum(x < 800) -1)
+n_within_800m
+
+turbine_subset %>% 
+  mutate(
+    n_within_800m = apply(distance, 2, function(x) sum(x < 800) -1)
+  ) %>% 
+  ggplot() + 
+  geom_sf(aes(geometry = geometry, color = n_within_800m))
+```
+
+Ah cool, I'm happy this works. Let's see if we can put it all together, then.
+
+
+```{r}
+distance <- st_distance(turbine_t)
+
+turbine_t %>% 
+  mutate(
+    n_within_10000m = apply(distance, 2, function(x) sum(x < 10000) -1)
+  ) %>% 
+  ggplot() + 
+  geom_sf(aes(geometry = geometry, color = n_within_10000m),
+          size = 1) + 
+  scale_color_gradient(low = '#000000', high = '#ffffff') + 
+  theme(
+    plot.background = element_rect(fill = 'black'),
+    panel.background = element_rect(fill = 'black')
+  )
+```
+
+
