@@ -50,8 +50,9 @@ t <- turbine_t %>%
   coord_sf(xlim = x_lim, ylim = y_lim) +  # Set bounding box
   labs(
     title = "Wind Turbines of Canada",
-    subtitle = "Each dot is a wind turbine in Canada. The color of the dot\nrepresents the number of other wind turbines within thirty\nmiles of that turbine -- in other words, turbine density."
-  ) + 
+    subtitle = "Each dot is a wind turbine in Canada. The color of the dot\nrepresents the number of other wind turbines within thirty\nmiles of that turbine -- in other words, turbine density.",
+    caption = "Source: Government of Canada & Natural Earth  |  Visualization: @charliegallaghr"
+) + 
   # Modifications
   scale_color_gradient(name = "Turbines within 30 miles", 
                        low = '#122e26', high = '#04c92c',
