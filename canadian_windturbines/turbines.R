@@ -72,7 +72,7 @@ t <- turbine_t %>%
     plot.subtitle = element_text(size = 14, 
                                  color = '#cccccc',
                                  margin = margin(0, 0, 10, 0)),
-    panel.background = element_rect(fill = 'black'),
+    panel.background = element_rect(fill = 'black', color = 'black'),
     panel.grid.major = element_line(color = '#adadad55'),
     legend.position = c(0.85, 0.8),
     legend.background = element_rect(fill = '#4a4a4a33'),
@@ -80,6 +80,8 @@ t <- turbine_t %>%
     text = element_text(color = '#8a8a8a', 
                         family = 'Roboto Lt'),
   )
+
+
 
 svg(filename = 'turbines.svg', width = 11, height = 6.5)
 t

@@ -1,0 +1,91 @@
+---
+title: "IKEA Furniture"
+output: html_notebook
+---
+
+```{r setup}
+library(tidyverse)
+```
+
+```{r}
+ikea <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-11-03/ikea.csv', col_types = cols(
+  .default = col_character(),
+  X1 = col_double(),
+  price = col_double(),
+  old_price = col_character(),
+  sellable_online = col_logical(),
+  depth = col_double(),
+  height = col_double(),
+  width = col_double()
+)) %>% 
+  select(-X1) %>% 
+  mutate(
+    old_price = case_when(
+      old_price == "No old price" ~ NA_character_,
+      TRUE ~ old_price
+    ),
+    old_price = str_replace_all(old_price, "(SR )|(,)", ""),
+    old_price = as.numeric(old_price),
+    other_colors = case_when(
+      other_colors == "No" ~ FALSE,
+      other_colors == "Yes" ~ TRUE
+    )
+  )
+
+skimr::skim(ikea)
+
+```
+
+This week's data is IKEA furniture. The unit of observation is the item ID and the category. There are some duplicate IDs, but ID/category should be unique. Sometimes, an item shows up in more than one category, so it is listed twice; all the details are the same, so in summaries I should account for this. 
+
+There is price data, but it is in Saudi Riyals. When there's a sale, the item is listed with an `old_price`, which is also in Riyals. There is depth, height, and width (cm). I should modify the variables types when I import, though, because there are some mistakes. `old_price` is poorly made. There are two types of values, "No old price" (missing) and "SR xx,xxx" (price). So, the price has commas and a currency prefix, and it has the wrong NA value. Done above. 
+
+# The Data
+I don't have any immediate inspiration for this week's visualization. Let's start with the data's characteristics and work forwards from there. 
+
+- Cross-section of prices on April 20, 2020. 
+- 17 categories, 607 names, 381 designers; 2,962 item IDs
+
+Maybe a fun idea is looking at the ratio of vowels to letters, or the share of vowels with dots. The names are so hard to pronounce sometimes... It would be fun to visualize that. Here's one idea then, which is also good for text analysis practice: plot the words as points, x is random and y is the ratio of consonants to vowels. 
+
+How would I count types of characters? Maybe with a `grepl` on consonants or something, then count the number of TRUES for each observation. Hm. 
+
+
+
+```{r}
+cons <- str_count(tolower(ikea$name), "[bcdfghjklmnpqrstvwxyz]")
+vow <- str_count(tolower(ikea$name), "[aeiouöäå]") 
+
+rat <- vow / cons
+rat[1:100]
+```
+
+This works well. Let's make the dataset. 
+
+```{r}
+ikea_names <- ikea %>%
+  select(name) %>% 
+  unique() %>% 
+  mutate(
+    cons = str_count(tolower(name), "[bcdfghjklmnpqrstvwxyz]"),
+    vow = str_count(tolower(name), "[aeiouöäå]"),
+    vow_spec = str_count(tolower(name), "[öäå]"),
+    nchar = nchar(name),
+    ratio = vow / cons,
+    pct_cons = cons / nchar
+  ) %>% 
+  select(name, cons:pct_cons)
+```
+
+
+```{r}
+ikea_names %>% 
+  ggplot() + 
+  geom_text(aes(x = 1, y = ratio, label = name), 
+            position = position_dodge()) + 
+  scale_y_reverse()
+```
+
+
+
+
