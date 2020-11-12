@@ -1,0 +1,147 @@
+---
+title: "Landlines"
+output: html_notebook
+---
+
+
+```{r setup}
+library(tidyverse)
+library(countrycode)
+library(lubridate)
+```
+
+This week's data describes landlines and mobile phones, specifically number of subscriptions of each for each country in the world. 
+
+```{r}
+mobile <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-11-10/mobile.csv')
+landline <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-11-10/landline.csv')
+
+
+phones <- landline %>% 
+  left_join(
+    select(mobile, code, year, mobile_subs),
+    by=c("code","year")
+  )
+phones
+```
+
+
+This would be a good time to use the waterfall chart I made the other day (in the data visualization project). You can see new subscriptions or reductions in subscriptions over time. Let's try it with the US for simplicity. Here's the original visualization I made, inspired by [Anh Hoang Duc](https://anhhoangduc.com/blog/create-waterfall-chart-with-ggplot2/).
+
+```{r}
+set.seed(123)
+data <- data.frame(date = seq(1, 372, by = 31) %>% as_date)
+data <- data %>% 
+  mutate(new = abs(rnorm(12, 100, 10)) %>% round(0)) %>% 
+  mutate(churn = abs(rnorm(12, 50, 30)) %>% round(0)) %>% 
+  mutate(net = new - churn)  %>% 
+  mutate(eop = cumsum(net)) %>% 
+  select(-net)
+
+waterfall_data <- data %>% 
+  mutate(
+    ymax = eop + churn
+  ) %>% 
+  pivot_longer(cols = new:churn) %>% 
+  mutate(
+    name = factor(name, levels = c('new','churn')), # Proper ordering
+    xmin = case_when(
+      name == 'new' ~ date - days(12),
+      name == 'churn' ~ date
+    ),
+    xmax = case_when(
+      name == 'new' ~ date,
+      name == 'churn' ~ date + days(12)
+    ),
+    ymin = case_when(
+      name == 'new' ~ ymax - value,
+      name == 'churn' ~ eop
+    )
+  )
+
+waterfall_data %>% 
+  ggplot() + 
+  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax,
+            group = name, fill = name)) + 
+  geom_line(aes(x = date, y = eop), size = 1, color = '#193e73') + 
+  geom_point(aes(x = date, y = eop), size = 2, color = '#193e73') + 
+  labs(
+    title = "Waterfall Chart",
+    subtitle = "Net change, accompanied by a decomposition of the net change"
+  ) + 
+  scale_fill_manual(values = c('#808080', '#ff5959')) + 
+  theme_minimal() + 
+  theme(
+    axis.line.x = element_line(),
+    axis.line.y = element_line()
+  )
+```
+
+For this, I only need:
+
+1. Net change in phone lines
+2. Change in cell phones
+3. Change in landlines
+4. Date, country
+
+First, difference the data to create the dataset.
+
+```{r}
+phones <- phones %>% 
+  mutate(
+    lag_landline = lag(landline_subs),
+    diff_landline = landline_subs - lag_landline,
+    lag_mobile = lag(mobile_subs),
+    diff_mobile = mobile_subs - lag_mobile,
+    net_phones = landline_subs + mobile_subs
+  ) %>% 
+  select(-landline_subs, -lag_landline, -mobile_subs, -lag_mobile) %>% 
+  filter(entity == "United States")
+```
+
+
+The net change is the sum of diff_mobile and diff_landline. 
+
+```{r}
+phone_waterfall <- phones %>% 
+  mutate(
+    date = ymd(paste0(year, '01-01')),
+    ymax = net_phones - diff_landline
+  ) %>% 
+  pivot_longer(cols = c(diff_landline, diff_mobile)) %>% 
+  mutate(
+    name = factor(name, levels = c('diff_mobile','diff_landline')), # Proper ordering
+    xmin = case_when(
+      name == 'diff_mobile' ~ date - weeks(20),
+      name == 'diff_landline' ~ date
+    ),
+    xmax = case_when(
+      name == 'diff_mobile' ~ date,
+      name == 'diff_landline' ~ date + weeks(20)
+    ),
+    ymin = case_when(
+      name == 'diff_mobile' ~ ymax - value,
+      name == 'diff_landline' ~ net_phones
+    )
+  )
+  
+
+phone_waterfall %>% 
+  ggplot() + 
+  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax,
+            group = name, fill = name)) + 
+  geom_line(aes(x = date, y = net_phones), size = 1, color = '#193e73') + 
+  geom_point(aes(x = date, y = net_phones), size = 2, color = '#193e73') + 
+  labs(
+    title = "Waterfall Chart",
+    subtitle = "Net change, accompanied by a decomposition of the net change"
+  ) + 
+  scale_fill_manual(values = c('#808080', '#ff5959')) + 
+  theme_minimal() + 
+  theme(
+    axis.line.x = element_line(),
+    axis.line.y = element_line()
+  )
+```
+
+
