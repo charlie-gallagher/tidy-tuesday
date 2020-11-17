@@ -1,0 +1,105 @@
+---
+title: "Tour de France"
+output: html_notebook
+---
+
+# Introduction
+
+```{r setup}
+library(tidyverse)
+library(lubridate)
+```
+
+```{r}
+tdf <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-04-07/tdf_winners.csv')
+
+```
+
+This data is a little less rich than the original data, but getting a package from source is such a pain for me that I'm willing to ignore this. 
+
+```{r}
+tdf %>% 
+  skimr::skim()
+```
+
+Contained here are 106 Tours up through July, 2019. Each observation is one contest, and the observations contain information on the winning riders only. 
+
+Ideas: nationality rankings with a bump chart; show speeds in some relative way, such as the margin of victory Armstrong or Pantani would have won by if they competed at their fastest in earlier competitions; relate variables like height and weight and speed; compospe a graphic that shows how the Tour has changed over time (distance, speed, margins); show margins of winning with a lollipop chart.
+
+Maybe margins is an interesting tack. Let's look. First, the range of margin is from 0.0022 to 2.99, which leaves me wondering if this is measured in hours or minutes. Probably hours, because 0.0022 minutes is potentially too close to call (2 thousandths of a minute is 0.13 seconds). So, let's say it's hours. Confirmed with source that it is in hours. I have 92.5% of the data complete. 
+
+How has the difference in hours changed over time? 
+
+```{r}
+tdf %>% 
+  ggplot() + 
+  geom_point(aes(x = start_date, y = time_margin))
+```
+
+The data is as predicted, which is very cool. But this should be interpreted with some caution as well, because the races have changed as well. Let's make this relative to the total time. 
+
+```{r}
+tdf %>% 
+  mutate(
+    rel_margin = time_margin / time_overall
+  ) %>% 
+  ggplot() + 
+  geom_point(aes(x = start_date, y = rel_margin))
+```
+
+The data levels out somewhat, but in general it remains a clear trend. What about by decade? Let's plot the mean relative margin as a line for each decade.
+
+```{r}
+to_decade <- function(date) {
+  year = lubridate::year(date)
+  decade = year - (year %% 10)
+  decade_date = ymd(paste0(decade, '-01-01'))
+  return(decade_date)
+}
+
+
+tdf <- tdf %>% 
+  mutate(
+    rel_margin = time_margin / time_overall,
+    decade_start = to_decade(start_date)
+  )
+
+
+tdf_decade <- tdf %>% 
+  group_by(decade_start) %>% 
+  summarize(
+    mean_rel_margin = mean(rel_margin, na.rm = TRUE)
+  )
+
+tdf %>% 
+  ggplot() + 
+  geom_point(aes(x = start_date, y = rel_margin)) + 
+  geom_point(data = tdf_decade, aes(x = decade_start, y = mean_rel_margin),
+              color = 'red') + 
+  geom_line(data = tdf_decade, aes(x = decade_start, y = mean_rel_margin),
+              color = 'red')
+```
+
+
+Looks good. Lets make it easier to look at by using segments that span the length of each decade. 
+
+```{r}
+tdf_decade %>% 
+  mutate(
+    decade_end = decade_start + years(10) - days(1)
+  ) %>% 
+  # pivot_longer(cols = c(decade_start, decade_end)) %>% 
+  ggplot() + 
+  geom_segment(aes(x = decade_start, xend = decade_end,
+               y = mean_rel_margin, yend = mean_rel_margin),
+               size = 2, color = "#05f2cfbb") +
+  geom_point(data = tdf, aes(x = start_date, y = rel_margin)) + 
+  theme_minimal() + 
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+  
+```
+
+I'm impressed with how good this looks on its own. I think I might keep it and just add annotations. 
