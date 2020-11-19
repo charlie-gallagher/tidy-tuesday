@@ -38,10 +38,10 @@
 ![week 36](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/crop_yields/crop.png)
 
 ### Week 35
-![week 35](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/chopped/chopped.png)
+![week 35](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/chopped/pdf/chopped_final.png)
 
 ### Week 34
-![week 34](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/extinct_plants/extinct_plants.png)
+![week 34](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/extinct_plants/pdf/extinct_plants.jpg)
 
 ### Week 6
 ![week 33](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/nfl/pdf/nfl.jpg)
