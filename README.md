@@ -25,13 +25,13 @@
 
 
 ### Week 39
-![week 39](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/himilayan_mts/everest.png)
+![week 39](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/himalayan_mts/everest.png)
 
 ### Week 38
 ![week 38](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/tidykids/tidykids.png)
 
 ### Week 37
-![week 37](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/friends/friends.png)
+![week 37](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/friends/friends_plots.png)
 
 
 ### Week 36
@@ -44,5 +44,5 @@
 ![week 34](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/extinct_plants/pdf/extinct_plants.jpg)
 
 ### Week 6
-![week 33](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/nfl/pdf/nfl.jpg)
+![week 33](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/nfl/pdf/nfl_02.jpg)
 
