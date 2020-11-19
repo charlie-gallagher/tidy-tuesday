@@ -1,28 +1,48 @@
 # Tidy Tuesday
 [Tidy Tuesday](https://github.com/rfordatascience/tidytuesday) is "a weekly data project aimed at the R ecosystem." I store my own contributions in this repo. All my contributions can also be seen on my twitter: [@charliegallaghr](https://twitter.com/CharlieGallaghr). 
 
-Published visualizations:
+# Gallery
+### Week 47
+![week 47](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/tourdefrance/tour.png)
 
-- NFL
-- Extinct plants
-- Chopped
-- Wheat Yields
-- Friends
-- State spending on libraries
-- Everest
-- Taylor Swift
+### Week 46
+![week 46](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/landline/landline.png)
 
-Projects potentially worth perusing:
+### Week 45
+![week 45](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/ikea/ikea.png)
 
-- NFL
-- Hotels (a more in-depth data exploration)
-- Spotify (text analysis and an unpublished Beatles graphic)
-- Coffee
-- Extinct plants
+### Week 44
+![week 44](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/canadian_windturbines/turbines.png)
 
-Unfinished and uninteresting projects:
+### Week 43
+![week 43](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/beer_fest/beer_fest.png)
 
-- Australia
-- Measles
-- Passwords
-- San Fran (although this has some mapping; it's very dense)
+### Week 41
+![week 41](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/ncaa/ncaa.png)
+
+### Week 40
+![week 40](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/taylor_swift/taylor_swift.png)
+
+
+### Week 39
+![week 39](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/himilayan_mts/everest.png)
+
+### Week 38
+![week 38](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/tidykids/tidykids.png)
+
+### Week 37
+![week 37](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/friends/friends.png)
+
+
+### Week 36
+![week 36](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/crop_yields/crop.png)
+
+### Week 35
+![week 35](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/chopped/chopped.png)
+
+### Week 34
+![week 34](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/extinct_plants/extinct_plants.png)
+
+### Week 6
+![week 33](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/nfl/pdf/nfl.jpg)
+
