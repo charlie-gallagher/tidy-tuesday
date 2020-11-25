@@ -1,0 +1,93 @@
+---
+title: "Washington Trails"
+output: html_notebook
+---
+
+Another Tidy Tuesday, but I'm getting a bit of a late start on this one. Further, I have no inspiration. Anyway, let's get going. 
+
+```{r, include=FALSE}
+library(tidyverse)
+library(janitor)
+library(skimr)
+library(ggforce)
+```
+
+
+```{r}
+wa <- readr::read_rds(url('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-11-24/hike_data.rds')) %>% 
+  mutate(
+    gain = as.numeric(gain),
+    highpoint = as.numeric(highpoint),
+    rating = as.numeric(rating)
+  )
+
+wa %>% 
+  skim()
+```
+
+Nearly 2000 observations, the unit of observation is the trail, I'm guessing. There are only 1924 names of trials, so some unsurprisingly repeat. Will maybe make a unique identifier for each. 
+
+Variables included are:
+
+- name
+- location
+- length
+- gain
+- highpoint
+- rating
+- description
+- features
+
+What might be in features? There are 1,071 unique values. Some example are: 
+
+```
+c("Dogs allowed on leash", "Wildlife", "Good for kids", "Lakes", "Fall foliage")
+c("Old growth", "Rivers", "Good for kids", "Dogs allowed on leash", "Waterfalls")
+c("Wildlife", "Good for kids", "Dogs allowed on leash", "Rivers")
+```
+
+So, each is a vector of features. Fair enough. Length is messy ("2.3 miles, roundtrip"), and possible values seem to include "roundtrip" or "oneway". These should be split into two variables: length in miles and loop-type or however you might call it. 
+
+```{r}
+wa <- wa %>% 
+  separate(col = length, into = c("len_miles", "len_type"),
+                  sep = " miles, ", remove = FALSE) %>% 
+  mutate(
+    len_miles = as.numeric(len_miles)
+  )
+```
+
+Another value includes "miles of trails", which affect 43 out of 1958, so I'm going to just ignore it for now unless it becomes an important part of the analysis. 
+
+Location is another free-form character string, but in general, everything before 
+
+Make two graphics for each type of trail. If round-trip, make it a circle where the circumference is the round trip length. 1,769 trails are round-trip, so there is plenty of data. Can I map circumference to length? Maybe. I think by default `geom_point` uses area as the mapping, so I will have to work with that unless I think of something else. 
+
+`{ggforce}` has a `geom_circle` that maps the data to the radius, rather than the area. This is fine for my purposes, I think. If I want to map length to circumference, I can map a transformation of length to radius. 
+
+```{r}
+wa_c <- wa %>%
+  filter(len_type == "roundtrip") %>% 
+  mutate(
+    radius = len_miles / (pi * 2)
+  )
+
+wa_c %>% 
+  slice_head(n = 25) %>% 
+  ggplot() + 
+  geom_circle(aes(x0 = 0, y0 = radius, r = radius)) + 
+  coord_fixed()
+```
+
+I like it... Obvious weaknesses include that the data doesn't communicate the true distances well, but that's made up for because it shows how much longer each round trip is compared to the last one. It's a fairly literal interpretation of the data, so what could go wrong... Now, should I hang it from the ceiling or raise it from the floor? 
+
+```{r}
+max = 6
+wa_c %>% 
+  slice_head(n = 25) %>% 
+  ggplot() + 
+  geom_circle(aes(x0 = 0, y0 = max - radius, r = radius)) + 
+  coord_fixed()
+```
+
+Oh no, the coordinates aren't level anymore... Weird. Well, I think this is a compelling enough graphic for this week. 
