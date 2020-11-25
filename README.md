@@ -2,6 +2,9 @@
 [Tidy Tuesday](https://github.com/rfordatascience/tidytuesday) is "a weekly data project aimed at the R ecosystem." I store my own contributions in this repo. All my contributions can also be seen on my twitter: [@charliegallaghr](https://twitter.com/CharlieGallaghr). 
 
 # Gallery
+### Week 48
+![week 48](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/wash_trails/washington.png)
+
 ### Week 47
 ![week 47](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/tourdefrance/tour.png)
 
