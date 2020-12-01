@@ -1,0 +1,354 @@
+---
+title: "Toronto Homeless Shelters"
+output: html_notebook
+---
+
+This week's data comes from the package `opendatatoronto`. 
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+library(ggmap)            # Plotting maps with `ggplot2`
+library(sf)               # GIS data structures
+library(opendatatoronto)  # For Toronto street map data
+source("./register_google.R")  # For Google geocode API, you need 
+                               # to create your own. See below.
+
+shelters <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-12-01/shelters.csv')
+
+```
+
+This is a fairly large dataset (115,916 obs.) with data on homeless shelters in toronto, their occupancy and capacity, and their exact location down to the postal code (includes address--use GIS lookup). Let's look at the date range. 
+
+```{r}
+skimr::skim(shelters)
+```
+
+Huh, I've never seen a variable of type POSIXct. It's apparently just a date/time. I really should invest more in my knowledge of date/times in R. Anyway, the data spans from January 1, 2017 to December 31, 2019. That's three years, and there are 1,095 unique values, so every date is accounted for by some shelter. 
+
+## Geocoding
+Geocoding the addresses (getting coordinates for an address) will allow me to map the data on a map of Toronto. 
+
+The `register_google.R` file contains your personal Google API key, which you should to keep secret. For that reason, I'm using a source file formatted like this: 
+
+```{r}
+ggmap::register_google(key = "your_key_here")
+```
+
+And I'm adding it to my `.gitignore`. Now I can use `ggmap::geocode` to find the longitude and latitude of each individual location. There are 65 shelters, so let's make a dataset containing only those. 
+
+```{r}
+# Add address variable to shelters
+shelters <- shelters %>% 
+  mutate(
+    address = paste0(shelter_address, ", ", shelter_city, 
+                     ", ", shelter_province,
+                     " ", shelter_postal_code, ", Canada")
+  )
+
+shelters_addr <- shelters %>% 
+  select(address) %>%       # NOTE: Select() keeps as tibble; pull makes vector
+  unique() %>% 
+  mutate_geocode(address)
+
+shelters <- shelters %>% 
+  left_join(shelters_addr, by = "address")
+```
+
+There are a number of shelter programs at each address (from 1 to many), so I will only collect address and merge them in. This should work fine. A note about the usage here: I create a different dataset with a unique set of addresses. This is because I can't seem to make `mutate_geocode` work quickly on the whole dataset. There is an option `force` which will force an online query even if the data is cached. I tried setting this to FALSE but it still made hundreds of queries. No worries, this is fine. A merge is probably faster considering how many observations there are. 
+
+
+
+# Ideas for Visualization
+I would like to start by plotting the shelters on a street map of Toronto. After that maybe I can do a Sigmoid plot. 
+
+## Street map
+I have to do a few things. First, I need to create an SF data frame with the data I already have. This should be as simple as a single call. 
+
+```{r}
+shelters <- sf::st_as_sf(shelters, 
+                         coords = c("lon", "lat"), 
+                         crs = 4326,
+                         remove = FALSE)
+shelters_addr <- st_as_sf(shelters_addr, 
+                          coords = c("lon","lat"), 
+                          crs = 4326,
+                          remove = FALSE)
+```
+
+Now I only need the street data, which I reckon I can get from `opendatatoronto`. 
+
+```{r}
+toronto <- show_package("1d079757-377b-4564-82df-eb5638583bfb") %>% 
+  list_package_resources() %>% 
+  filter(format == "SHP") %>% 
+  get_resource()
+
+plot(st_geometry(toronto))
+```
+
+This looks too crowded. I'm not sure how the data is structured, so it might be overplotting with historical data or something. Otherwise, it might just be a very large area. Let's look at the data a bit. 
+
+```{r}
+names(toronto)
+head(toronto)
+```
+
+The column `FCODE_DESC` seems to be what I'm looking for. I only want to plot streets, not trails, rivers, and major railways. What are the values for this?
+
+```{r}
+toronto %>% janitor::tabyl(FCODE_DESC)
+```
+
+So, lots of things, not all clearly named. I want:
+
+```{r}
+roads <- c("Access Road", "Busway", "Expressway", "Expressway Ramp", "Laneway",
+  "Local", "Major Arterial", "Major Arterial Ramp", "Minor Arterial",
+  "Minor Arterial Ramp")
+
+toronto_rds <- toronto %>% 
+  filter(FCODE_DESC %in% roads)
+
+rm(roads)
+
+plot(st_geometry(toronto_rds))
+```
+
+That's better -- not perfect, but much better. It works especially well when you zoom in on it. 
+
+Let's put them together. 
+
+```{r}
+plot(st_geometry(toronto_rds))
+plot(st_geometry(shelters_addr), pch = 20, col = 'red', add = TRUE)
+```
+
+Thanks to janky plotting this doesn't work with `base::plot` in an R Notebook but I'll move to `ggplot2` and `ggmap`. 
+
+```{r}
+ggplot() + 
+  geom_sf(data = toronto_rds) +
+  geom_sf(data = shelters_addr, color = 'red', size = 2) + 
+  theme_void()
+```
+
+This is a precise plot (although ugly) of the city of Toronto. If we wanted to simplify it, we could plot only the neighborhoods of the city. 
+
+```{r}
+to_nbr <- list_package_resources("https://open.toronto.ca/dataset/neighbourhoods/") %>%
+  get_resource()
+
+ggplot(to_nbr) + 
+  geom_sf() + 
+  geom_sf(data = shelters_addr)
+```
+
+One interesting project would be to identify underserved neighborhoods. This is well beyond the scope of a Tidy Tuesday project, though. A simple version might be looking at neighborhoods, their median incomes, populations, and how far they are from the nearest shelter. Because this could be construed as a value judgment, and because it's a hairy question, I'm not going to try to answer it here. Instead, let's try to make a Sigmoid chart with this data. 
+
+## Sigmoid Map
+A Sigmoid contains the map, the points, and segments from the points (provided by `ggbump::geom_sigmoid`) that connect to other points. For now, let's say that all these segments connect to the same point. Now, I'm assuming a little that I can plot points and segments on top of a `geom_sf`. 
+
+```{r}
+ggplot() + 
+  geom_sf(data = to_nbr) + 
+  geom_sf(data = shelters_addr) + 
+  geom_point(aes(x = -79.5, y = 43.85), shape = 'plus', size = 10)
+```
+
+Well that's a relief. Okay, then I need the points and I need a single point for them to all go to. I kept the coordinate columns so this should be simple. 
+
+
+```{r}
+ggplot() + 
+  geom_sf(data = to_nbr) + 
+  geom_sf(data = shelters_addr) + 
+  ggbump::geom_sigmoid(
+    data = shelters_addr,
+    aes(x = lon, xend = -78.9,
+        y = lat, yend = 43.75,
+        group = address),
+    smooth = 6,
+    color = "#09994766"
+  ) + 
+  theme_void()
+  
+```
+
+So that's the basic idea. Now that I know I can do it, I have to think critically about whether or not it's worth anything. Of course I can change where the sigmoid lines go, but even then my options are traditionally limited to segments. Radical ideas are always welcome. I could fade the lines into neighborhood circles. Let me sketch it out really fast. 
+
+The basic idea of the circle might work. I could get rid of the points, summarize by the neighborhood, and draw lines to points whose area is mapped to total neighborhood occupancy and whose shade is mapped to the average occupancy (%) of all the shelters in that neighborhood over a year. This maps two variables to each region instead of one, which is how many you get with a choropleth for example. Well, let's try it. 
+
+
+# Capacity and Occupancy
+My best guess, after looking through the data, is that the unit of observation is the program, not the shelter. There are 168 programs and 68 addresses. Is capacity stable over time? Is it seasonal? Is capacity determined by the address or the program? 
+
+
+
+First, I'm going to limit my data to 2019. Now, how many program/capacity values are there? 
+
+```{r}
+shelters %>% 
+  group_by(program_name, capacity) %>% 
+  summarize() %>% 
+  nrow()
+```
+
+There are 155 programs and 651 program/occupancy combinations. 
+
+Change of plan. Instead of an average, I can take the year as a whole. How many clients are allowed in each year, and how many might have been allowed in?
+
+```{r}
+shelters %>% 
+  filter(lubridate::year(occupancy_date) == 2019) %>% 
+  group_by(address, shelter_name, program_name, AREA_SHORT_CODE) %>% 
+  summarize(
+    yr_capacity = sum(capacity, na.rm = TRUE),
+    yr_occupancy = sum(occupancy, na.rm = TRUE)
+  )
+```
+
+
+I can also get a total for each neighborhood, once I find out which neighborhood each location is in. This is simple with the neighborhood map and `sf`. 
+
+
+# Neighborhoods
+```{r}
+nb_id <- st_within(shelters_addr, to_nbr) %>% unlist()
+shelters_addr <- cbind(
+  shelters_addr, 
+  st_drop_geometry(to_nbr)[nb_id, "AREA_SHORT_CODE"]
+)
+
+shelters <- shelters %>% 
+  select(-lat, -lon) %>%
+  left_join(st_drop_geometry(shelters_addr), by = "address")
+```
+
+
+And finally, merge back and plot.
+
+```{r}
+shelter_neighborhood <- shelters %>% 
+  sf_drop_geometry() %>% 
+  filter(lubridate::year(occupancy_date) == 2019) %>% 
+  group_by(AREA_SHORT_CODE) %>% 
+  summarize(
+    yr_capacity = sum(capacity, na.rm = TRUE),
+    yr_occupancy = sum(occupancy, na.rm = TRUE)
+  )
+
+to_nbr <- to_nbr %>% 
+  left_join(shelter_neighborhood, by = "AREA_SHORT_CODE")
+
+# Plot
+ggplot() + 
+  geom_sf(data = to_nbr, aes(fill = yr_occupancy))
+```
+
+
+# The First Plot Idea
+The plot would be a sigmoid where each line is drawn from the centroid of the neighborhood and connects with a circle whose size and color are mapped to the capacity and relative occupancy (respectively). 
+
+### Centroids
+There are 36 neighborhoods with data. Then, I need 36 centroids.
+
+```{r}
+nbr_points <- to_nbr %>% 
+  filter(!is.na(yr_occupancy)) %>% 
+  st_drop_geometry() %>% 
+  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326, remove = FALSE)
+
+ggplot() + 
+  geom_sf(data = to_nbr) + 
+  geom_sf(data = nbr_points)
+
+```
+
+Neat. Every neighborhood with a shelter is given a dot. This also gives me a place to start the sigmoid. 
+
+```{r}
+ggplot() + 
+  geom_sf(data = to_nbr) + 
+  geom_sf(data = nbr_points) + 
+  ggbump::geom_sigmoid(
+    data = nbr_points,
+    aes(x = LONGITUDE, xend = -78.9,
+        y = LATITUDE, yend = 43.7,
+        group = AREA_ID)
+  )
+```
+
+That's the gist, anyway. Now, I need a field of dots to surround the graph to serve as x/y ends. 
+
+### Mapped dots
+First, let's try random dots in the range of x (-79.1, -78.1) and y (43.55, 43.85).
+
+```{r}
+nbr_points <- to_nbr %>% 
+  filter(!is.na(yr_occupancy)) %>% 
+  st_drop_geometry() %>% 
+  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326, remove = FALSE)
+
+nbr_points <- nbr_points %>% 
+  mutate(
+    longend = runif(36, min = -79.1, max = -78.9),
+    latend = runif(36, min = 43.55, max = 43.85)
+  )
+
+ggplot() + 
+  geom_sf(data = to_nbr) + 
+  geom_sf(data = nbr_points) + 
+  geom_sigmoid(
+    data = nbr_points,
+    aes(x = LONGITUDE, xend = longend,
+        y = LATITUDE, yend = latend,
+        group = AREA_ID)
+  ) + 
+  geom_point(data = nbr_points, aes(x = longend, y = latend, 
+                                     size = yr_capacity, 
+                                     color = yr_occupancy / yr_capacity)
+  )
+```
+
+Hideous, but I love it. Now I just have to figure out a nice way to plot the circles. 
+
+There's probably too much overlap in the middle to ever make sense of this. I could make sure everything is well-ordered but that's no guarantee that it will be legible. 
+
+```{r}
+nbr_points <- to_nbr %>% 
+  filter(!is.na(yr_occupancy)) %>% 
+  st_drop_geometry() %>% 
+  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326, remove = FALSE)
+
+tmp_df <- data.frame(
+    longend = runif(36, min = -79.1, max = -78.9),
+    latend = runif(36, min = 43.55, max = 43.85)
+  ) %>% 
+  arrange(desc(latend))
+
+nbr_points <- nbr_points %>% 
+  arrange(desc(LATITUDE)) %>% 
+  cbind(tmp_df)
+
+ggplot() + 
+  geom_sf(data = to_nbr) + 
+  geom_sf(data = nbr_points) + 
+  geom_sigmoid(
+    data = nbr_points,
+    aes(x = LONGITUDE, xend = longend,
+        y = LATITUDE, yend = latend,
+        group = AREA_ID)
+  ) + 
+  geom_point(data = nbr_points, aes(x = longend, y = latend, 
+                                     size = yr_capacity, 
+                                     color = yr_occupancy / yr_capacity)
+  )
+```
+
+# Second Plot Idea
+Okay, so that was fun to try, but ultimately it doesn't work. It's just too busy. I tried a few more things (coloring lines to match large end-circles, extending the range) and nothing worked. Time to retire graph number one. 
+
+Still, now I have both neighborhood data and program data. I can make address-level data fairly easily as well. I just need an idea. And an idea, I have not. 
+
