@@ -348,7 +348,41 @@ ggplot() +
 ```
 
 # Second Plot Idea
-Okay, so that was fun to try, but ultimately it doesn't work. It's just too busy. I tried a few more things (coloring lines to match large end-circles, extending the range) and nothing worked. Time to retire graph number one. 
+Okay, so that was fun to try, but ultimately it doesn't work. It's just too busy. I tried a few more things (coloring lines to match large end-circles, extending the range) and nothing worked. Time to retire graph number one. Still, now I have both neighborhood data and program data. I can make address-level data fairly easily as well. 
 
-Still, now I have both neighborhood data and program data. I can make address-level data fairly easily as well. I just need an idea. And an idea, I have not. 
+I ended up making a bar chart above the graphic. See `toronto_map1.R`. 
+
+# Third plot idea
+I'm still not satisfied with how these maps have turned out. It was a lot of work, and it's painful to see it go to waste. But rules are rules; anyway, it was more of an exercise in technique than proper data exposition. So, let's either move away from maps or create a neat, highly detailed graphic using the street-level data. I'll probably do that for fun later. In the meantime, let's find a new graphic. I have some large number of programs. One person noticed that most programs have the same categories: family, individual, refugee, etc. I could copy ysamano's graphic of polygon squares, showing the occupancy of each type. But that's too close to that Twitter user's graphic. 
+
+Small multiples do seem to be the way to go here. And that's something I have slim experience with to boot. 
+
+# Warming Stripes
+Okay, I'm going to make heat bars for each year. Apparently this is related to 'warming stripes', a popular graphic made to show climate change. Real simple: total occupancy / total capacity for each day 
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+
+shelters <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-12-01/shelters.csv')
+```
+
+
+There are a few ways to make heat bars, but the simplest is with `geom_col`. 
+
+```{r}
+agg_shelters <- shelters %>% 
+  group_by(occupancy_date) %>% 
+  summarize(
+    occ = sum(occupancy, na.rm = TRUE),
+    cap = sum(capacity, na.rm = TRUE),
+    rel_cap = occ / cap
+  )
+
+agg_shelters %>% 
+  ggplot() + 
+  geom_col(aes(x = occupancy_date, y = 1, fill = rel_cap)) + 
+  scale_fill_viridis_c()
+```
 
