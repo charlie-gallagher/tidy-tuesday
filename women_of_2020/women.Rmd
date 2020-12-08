@@ -1,0 +1,339 @@
+---
+title: "Women of 2020"
+output: html_notebook
+---
+
+```{r, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+
+library(igraph)
+library(ggraph)
+```
+
+This week's data comes from the BBC. 
+
+```{r}
+women <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-12-08/women.csv')
+```
+
+The data is fairly simple; just name, image, award category, country of residence, role/career, and a description of the women and their achievements. 
+
+```{r}
+women %>% 
+  skimr::skim()
+```
+
+There are exactly 100 observations, including one blank observation ("Unsung Hero," in observance of all the women who made a difference in 2020 but could not be fit on the list). Visualizing this type of data is not my strong suit. It focuses more on aesthetics than I'm used to. Put another way, the data can't tell me which visualization to use. Although that's not necessarily true. But there's no network, no obvious relationships between the women, and not much data. Let's take a look at some of the variables, though, to get a sense. 
+
+```{r}
+head(women, n = 10)
+```
+
+A long description variable lends itself to text analysis, and the spiky area of 'what makes a winner a winner,' a problem fraught with danger because (among other things no doubt) it lacks a counterfactual. A better visualization might break down the winners by category or role. Probably there aren't enough roles in common, but there are only five unique categories. 
+
+```{r}
+women %>% 
+  ggplot() + 
+  geom_bar(aes(x = category))
+```
+
+In fact, there are only five categories, and one is 'All', which contains one representative: the unsung hero. Well, a nice network could show the way things are related. There are 75 roles, so only a couple repeat. Let's see. 
+
+```{r}
+women %>% 
+  janitor::tabyl(role) %>% 
+  slice_max(order_by = percent, n = 10)
+```
+
+So, six activists, four campaigners and disability activists (resp.), three musicians and scientists (resp.) and a few pairs of things. There are many types of activist, so I could pull that out. 
+
+I guess I'm envisioning a graph, maybe a tree. At the center is the 'All' category, which breaks down into the other four categories, each of which breaks down into another subcategory, and finally we reach the people themselves. It would work as a treemap, even though that wouldn't be as visually nice as a well laid-out network. Let me look around to see what options I have. 
+
+Scroll nearly to the bottom of this [{ggraph}](https://www.data-imaginist.com/2017/ggraph-introduction-layouts/) page, and you'll see an example of the kind of tree I want to make. There's circle-packing, and circle-packing but the circles are dots and connected by lines. I'm not sure how to make the data for this, though. 
+
+It should be basic to create a one-level dataset with `igraph` that I can turn into the most basic type of packed circles. Example:
+
+
+```{r}
+tr <- make_tree(40, children = 3, mode = "undirected")
+plot(tr, vertex.label = NA, vertex.size = 10)
+```
+
+How do I turn my data into this type of graph? I need just three levels at first. 
+
+1. Top 100 women, center
+2. Categories (all, creativity, identity, knowledge, leadership)
+3. People
+
+A basic blueprint is:
+
+```raw
+from        to
+women       all
+women       creativity
+...
+women       leadership
+all         Unsung Hero
+creativity  Individual 1
+creativity  Individual 2
+...
+leadership  Individual 99
+```
+
+Then, set the name of the chart to 'Tree' for good measure, assign attributes later. 
+
+```{r}
+# Making dataset
+women_graph_df <- women %>% 
+  # Base layer
+  mutate(from = "BBC 100 Women") %>% 
+  select(from, to = category) %>% 
+  unique() %>% 
+  # add second layer
+  rbind(select(women, from = category, to = name)) %>% 
+  arrange(from)
+
+
+women_graph <- graph_from_data_frame(
+  d = women_graph_df
+)
+
+plot(women_graph,
+     vertex.size = 5, vertex.label = NA)
+```
+
+
+Now I can try to plot the packed circles with ggraph. 
+
+```{r}
+women_graph_df %>% 
+  ggraph(layout = "circlepack") + 
+  geom_node_circle() + 
+  coord_fixed() +
+  theme_void()
+```
+
+Oh neat. 
+
+```{r}
+ggraph(women_graph, layout = 'circlepack') + 
+  geom_edge_link() + 
+  geom_node_point() +
+  theme_void()
+```
+
+
+
+```{r}
+ggraph(women_graph, layout = 'tree') + 
+  geom_edge_diagonal() + 
+  theme_void()
+```
+
+
+In the last graph, how would I add names to the bottom of the graph? (NOTE: since this is not a dendrogram, it could be made in `ggplot` with `ggbump::geom_sigmoid`).
+
+First things first, let's add some attributes. To do this, you pass another data frame to `graph_from_data_frame` via the argument 'vertices'. This contains one entry for every vertex (from 1 to n) and variables for their attributes. All vertices have names, and in this case they are the names of the groups. 
+
+
+```{r}
+women_graph_lvl1 <- data.frame(
+  name = "BBC 100 Women",
+  level = 1,
+  category = NA
+)
+
+women_graph_lvl2 <- women %>% 
+  select(name = category) %>% unique() %>% 
+  mutate(level = 2, category = NA)
+  
+women_graph_lvl3 <- women %>% 
+  select(name, category) %>% 
+  mutate(
+    level = 3
+  )
+
+women_graph_df <- women %>% 
+  mutate(from = "BBC 100 Women") %>% 
+  select(from, to = category) %>% 
+  unique() %>% 
+  rbind(select(women, from = category, to = name)) %>% 
+  arrange(from)
+
+women_graph_vertices <- rbind(women_graph_lvl1, women_graph_lvl2, women_graph_lvl3)
+
+
+women_graph <- graph_from_data_frame(
+  d = women_graph_df,
+  vertices = women_graph_vertices,
+)
+
+```
+
+
+This gives me complete control over the vertex attributes. I haven't found as concise a method for making the graph data frame yet. This current method seems ok for now. 
+
+Adding color: 
+
+```{r}
+women_graph %>% 
+  ggraph(layout = "circlepack") + 
+  geom_node_circle(aes(fill = level)) + 
+  coord_fixed() +
+  theme_void()
+```
+
+```{r}
+ggraph(women_graph, layout = 'circlepack') + 
+  geom_edge_link() + 
+  geom_node_point(aes(size = 3-level, color = category)) + 
+  scale_size_continuous(range = c(3, 10))
+```
+
+
+```{r}
+ggraph(women_graph, layout = "treemap") + 
+  geom_node_tile(aes(fill = category))
+```
+
+So there are a few variations on the theme. I don't know much about attributes (leafs, etc.) but I have gotten colors to work on a basic level. Now, I would like to see coordinates if I could.
+
+```{r}
+ggraph(women_graph, layout = 'circlepack') + 
+  geom_edge_link() + 
+  geom_node_point(aes(size = 3-level, color = category)) + 
+  scale_size_continuous(range = c(3, 20)) + 
+  theme_minimal()
+```
+
+Better, I guess. 
+
+```{r}
+ggraph(women_graph, layout = 'tree') + 
+  geom_edge_diagonal(strength = 0.75) +
+  geom_node_point(aes(color = factor(level))) + 
+  theme_minimal()
+```
+
+
+Two useful attributes would be leaf status and country. Maybe country ought to be converted to continent. Also, I need to add a level for the 'activist' category, I think. Or maybe just a flag. Yeah, a flag would be better. 
+
+Let's try a tree map with fill is whether they are an activist. 
+
+```{r}
+women_graph_lvl1 <- data.frame(
+  name = "BBC 100 Women",
+  level = 1,
+  category = NA,
+  activist = NA
+)
+
+women_graph_lvl2 <- women %>% 
+  select(name = category) %>% unique() %>% 
+  mutate(level = 2, category = NA, activist = NA)
+  
+women_graph_lvl3 <- women %>% 
+  mutate(activist = grepl("(activist)|(Making a difference)", role, ignore.case = TRUE)) %>% 
+  select(name, category, activist) %>% 
+  mutate(
+    level = 3
+  )
+
+women_graph_vertices <- rbind(women_graph_lvl1, women_graph_lvl2, women_graph_lvl3)
+
+women_graph_df <- women %>% 
+  mutate(from = "BBC 100 Women") %>% 
+  select(from, to = category) %>% 
+  unique() %>% 
+  rbind(select(women, from = category, to = name)) %>% 
+  arrange(from)
+
+
+women_graph <- graph_from_data_frame(
+  d = women_graph_df,
+  vertices = women_graph_vertices,
+)
+```
+
+
+```{r}
+ggraph(women_graph, layout = 'circlepack') + 
+  geom_node_circle(aes(fill = level)) + 
+  geom_node_circle(aes(filter = activist), fill = 'gold') + 
+  coord_fixed()
+```
+
+
+That's a nice graph showing not only levels, but whether the person is an activist (gold). For simplicity, I didn't make 'activist' an aesthetic. Now, maybe it would be interesting to make an activist layer after all, so the circles would nest well. 
+
+```{r}
+women_graph_lvl1 <- data.frame(
+  name = "BBC 100 Women",
+  level = 1,
+  category = NA,
+  activist = NA
+)
+
+women_graph_lvl2 <- women %>% 
+  select(name = category) %>% unique() %>% 
+  mutate(level = 2, category = NA, activist = NA)
+  
+women_graph_lvl3 <- women %>% 
+  filter(!grepl("activist", role, ignore.case = TRUE)) %>% 
+  select(name, category) %>% 
+  rbind(data.frame(name = "Activist", category = NA)) %>% 
+  mutate(level = 3, activist = FALSE)
+
+women_graph_lvl4 <- women %>% 
+  filter(grepl("activist", role, ignore.case = TRUE)) %>% 
+  select(name, category) %>% 
+  mutate(level = 4, activist = TRUE)
+  
+
+women_graph_vertices <- rbind(women_graph_lvl1, 
+                              women_graph_lvl2, 
+                              women_graph_lvl3,
+                              women_graph_lvl4)
+
+women_graph_activist_lyr <- women %>% 
+  filter(grepl("activist", role, ignore.case = TRUE)) %>% 
+  select(to = name) %>% 
+  mutate(from = "Activist") %>% 
+  unique()
+
+women_graph_df <- women %>% 
+  mutate(from = "BBC 100 Women") %>% 
+  select(from, to = category) %>% 
+  unique() %>% 
+  mutate(role = NA) %>% 
+  rbind(select(women, from = category, to = name, role)) %>% 
+  mutate(
+    to = case_when(
+      grepl("activist", role, ignore.case = TRUE) ~ "Activist",
+      TRUE ~ to
+    )
+  ) %>%
+  select(from, to) %>%
+  rbind(women_graph_activist_lyr)
+
+
+
+
+
+women_graph <- graph_from_data_frame(
+  d = women_graph_df,
+  vertices = women_graph_vertices,
+)
+```
+
+
+
+```{r}
+ggraph(women_graph, layout = 'circlepack') + 
+  geom_node_circle()
+```
+
+I'm getting a multiple parent error. Some end point has more than one parent. I think it doesn't like the nesting of the 'activist' layer. The 'activist' groupings have multiple parents -- ah. I need to differentiate between the different 'activist' types. I can append the name I guess. This is getting pretty hairy; I'm not liking it too much. Maybe it's time for a redesign. I'm moving into an R file. 
+
