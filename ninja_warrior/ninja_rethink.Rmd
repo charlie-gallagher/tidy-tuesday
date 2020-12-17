@@ -1,0 +1,134 @@
+---
+title: "Rethinking the Network"
+output: html_notebook
+---
+
+
+```{r, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(magrittr)
+
+library(igraph)
+library(tidygraph)
+library(ggraph)
+
+library(cowplot)
+
+# Get data -------
+rm_paren <- "\\s?\\(.*\\)\\s?"  # Remove parentheses with optional spaces
+
+
+stage_ordering <- c('Qualifying','Semi-Finals','Finals',
+                    paste0('National Finals - Stage ', 1:4)) # stage ordering
+
+
+ninja <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-12-15/ninja_warrior.csv') %>% 
+  mutate(
+    round_stage = stringr::str_remove(round_stage, rm_paren),
+    obstacle_name = stringr::str_remove(obstacle_name, rm_paren),
+    round_stage = factor(round_stage, levels = stage_ordering)
+  )
+```
+
+
+I made circular network graphs of the relationships between objects (whenever two objects appear one after another, they get an edge). This had at least four major problems: 
+
+1. Overplotting occurs when the same combination appears in two rounds/stages. This happens very often with the American version, whose rounds frequently repeat. Also, there are many more of these seasons, and each season may have several locations, which increases overplotting significantly. 
+2. There is no clear way to organize the points. I used the round/stage that each obstacle most frequently appeared in, but frequently an obstacle appeared the same number of times in two or more rounds. 
+3. This leaves out information about the flow of obstacles in total. One R user made a linked list of the different flows through the obstacle courses. It was really nice. See that graphic [here](https://twitter.com/JoshDoesa/status/1338855469897674752). 
+4. The number of times a relationship appears is not shown in the graph. I experimented with size, but that didn't work well. A mix of size and opacity would be confusing. Colors are already used to distinguish rounds. 
+
+I'm considering limiting the data to the first three seasons (one location semi-final, final, then one location for national finals (japan)). Maybe even considering just looking at the various National Finals. The tweet I linked to above shows the flow from start to end. Is the flow the same in qualifying, semi-finals, and finals? National finals? Let's try to answer this question quickly. 
+
+```{r}
+ninja %>% 
+  tidyr::pivot_wider(names_from = round_stage, values_from = obstacle_name) %>% 
+  View()
+```
+
+From this, you can see that in the early seasons, the obstacle order was the same for Qualifying and Semi-Finals, though there were only six obstacles in the qualifying stage, and nine in the semi-finals stage. The Sasuke obstacles change between every stage, in the traditional way. This is the same in Las Vegas when the American Ninja Warrior finals move there. The structure is the same in the finals. Regionally, there are two rounds: Qualifying and Finals. Let me summarize with a table. 
+
+
+| Season      |  Structure |
+|-------------|------------|
+| 1-3         | Qualifying and semi-finals in Venice lead to Sasuke, National Finals |
+| 4-10        | Same structure as seasons 1-3, but labeled as Qualifying and Finals, instead of Qualifying and Semi-Finals. National finals takes place in Las Vegas, but structured same as Sasuke in Japan. |
+
+In summary: 
+
+- Semi-Finals and Finals are synonyms
+- National Finals is always a four-stage event; the stages retain the original Sasuke structure
+- The first stage (always Qualifying) has six obstacles. These are the same first six obstacles as the second stage (Semi-Finals or Finals if regional). The second stage has three additional obstacles for a total of nine.
+
+Armed with this knowledge, I can simplify the data somewhat, and make a better-informed decision regarding the visualization. For instance, knowing all this makes the last graphic even less appropriate, because the scheme is surprisingly standardized. There are regional differences, but knowing what I know about the second round being an extension of the first round -- that's important. Would it be interesting to copy the graphic linked above, but do it for the finals, and make it look better? I could possibly solve the overplotting problem
+
+with `geom_fan`, although there's no guarantee it'll work. Let's take each season and recreate that graph. 
+
+What will the structure look like? 
+
+# Season graph
+Here is a complete version: 
+
+```{r}
+e <- ninja %>% 
+  filter(grepl("National Finals - Stage 1", round_stage)) %>% 
+  group_by(season, round_stage) %>% 
+  mutate(next_obstacle = lead(obstacle_name, default = "Goal")) %>% 
+  ungroup() %>% 
+  select(from = obstacle_name, to = next_obstacle, season, location, obstacle_order) %>% 
+  mutate(from_name = from, to_name = to)
+
+
+# Vertices
+v <- ninja %>% 
+  filter(grepl("National Finals - Stage 1", round_stage)) %>% 
+  group_by(obstacle_name) %>% 
+  summarize(n = n()) %>% 
+  rbind(data.frame(obstacle_name = "Goal", n = 10))
+  
+  
+ninja_next <- e %>% graph_from_data_frame(vertices = v) %>% as_tbl_graph() 
+
+
+# Highlight first three seasons (Sasuke)
+
+seasons <- 1:3
+
+season_plots <- purrr::map(seasons, function(seas) {
+  ninja_next %>% 
+    ggraph(layout = 'sugiyama') + 
+    geom_edge_fan(aes(filter = season != seas,
+                      start_cap = label_rect(from_name),
+                      end_cap = label_rect(to_name)), strength = 5, edge_width = 0.5,
+                  arrow = arrow(length = unit(4, 'mm'), angle = 10, type = 'closed'),
+                  color = "#445468ff") + 
+    geom_edge_fan(aes(filter = season == seas, color = factor(season),
+                       start_cap = label_rect(from_name),
+                       end_cap = label_rect(to_name)), strength = 5, edge_width = 1,
+                   arrow = arrow(length = unit(4, 'mm'), angle = 10, type = 'closed')) + 
+    geom_node_text(aes(label = name, size = n), color = 'white') +
+    scale_edge_color_brewer(type = 'seq', palette = 2) +
+    scale_size(range = c(2, 6)) +
+    guides(edge_color = FALSE, edge_width = FALSE, size = FALSE) + 
+    theme_void() + 
+    theme(
+      text = element_text(color = 'white'),
+      plot.background = element_rect(fill = '#2c3643ff', color = NA),
+      plot.margin = margin(0, 25, 0, 25)
+    )
+})
+
+plot_grid(plotlist = season_plots, ncol = 3)
+```
+
+
+## `tweenr`
+With the `tweenr` package, or the `gganimate` package, I could create an animation showing the different paths one at a time. I guess I could do this now with `gganimate`, I suppose. Scratch that, to combine random PNGs you use Image Magick, apparently. 
+
+
+
+
+
+----
+Charlie Gallagher

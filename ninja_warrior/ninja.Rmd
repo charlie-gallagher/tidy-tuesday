@@ -1,0 +1,257 @@
+---
+title: "Sasuke, or Ninja Warrior"
+output: html_notebook
+---
+
+An old classic show! I used to watch this all the time when I was little. Let's get the data. 
+
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(magrittr)
+
+library(igraph)
+library(tidygraph)
+library(ggraph)
+
+knitr::opts_chunk$set(message=FALSE, warning=FALSE)
+
+```
+
+
+```{r}
+rm_paren <- "\\s?\\(.*\\)\\s?"  # Remove parentheses with optional spaces
+
+
+ninja <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-12-15/ninja_warrior.csv') %>% 
+  mutate(
+    round_stage = stringr::str_remove(round_stage, rm_paren),
+    obstacle_name = stringr::str_remove(obstacle_name, rm_paren)
+  )
+
+```
+
+```{r}
+skimr::skim(ninja)
+```
+
+Skimming this data doesn't give a very good understanding of its contents. There are 30 locations, 8 round/stages, and 225 obstacle names. I'm curious whether this is just the American version or a mix of both? 
+
+```{r}
+head(ninja, n = 10)
+```
+
+
+Just the American version... Dangit. Oh well, still have to do something. Let's get familiar. Each season has locations and round stages. Then, there are the obstacles. There is no further information about the obstacles except their order. What are we supposed to visualize here? There is no data but obstacle names and the round and location, and season. Ten seasons; initially, the national finals took place in Japan and were apart of the traditional Sasuke competitions starting with Sasuke 23. 
+
+There's not much to go on, so I'm going to work on my network building tools. 
+
+# `igraph` it
+
+## Obstacle-to-round
+
+I might relate obstacle to season, or obstacle to round. Season:  
+
+```raw
+from      to
+log       season 1
+log       season 2
+log       season 3
+globe     season 1
+globe     season 3
+...
+```
+
+Round:
+
+```raw
+from      to             occurances
+log       First round    10
+log       Second round   8
+globe     Third round    5
+globe     Final round    1
+...
+```
+
+This conveys more information about the difficulty of the obstacle, and it uses weights for each edge, which is an interesting feature. The structure is a tree. The problem is that it's difficult to visualize the number of occurrences (line weight? color?). But it's a simple construction, so let's run with it. Top 20 or so obstacles.
+
+```{r}
+ninja %>% 
+  group_by(round_stage, obstacle_name) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n))
+```
+
+
+What if I get rid of parentheticals? 
+
+```{r, message=FALSE}
+ninja_g <- ninja %>% 
+  group_by(round_stage, obstacle_name) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  filter(n > 2) %>% 
+  rename(from = round_stage, to = obstacle_name) %>% 
+  igraph::graph_from_data_frame() %>% 
+  as_tbl_graph()
+
+ninja_g %>% 
+  ggraph() + 
+  geom_node_point() + 
+  geom_edge_diagonal()
+```
+
+Well, I cut down on 10 observations, so it wasn't such a big deal. Still, probably helpful somehow. Anyway, removing those obstacles that appear two or fewer times, and I get 76 rows. 
+
+The basic graph is made, and there is some interesting overlap. I need to add some labels, and I should really add some attributes about the nodes. Let's start again. 
+
+```{r, message=FALSE, warning=FALSE}
+e <- ninja %>% 
+  group_by(round_stage, obstacle_name) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  filter(n > 2) %>% 
+  rename(from = round_stage, to = obstacle_name) %>% 
+  ungroup()
+
+v1 <- e %>% 
+  select(name = from) %>% 
+  unique() %>% 
+  mutate(leaf = FALSE)
+
+v2 <- e %>% 
+  select(name = to) %>% 
+  unique() %>% 
+  mutate(leaf = TRUE)
+
+v <- rbind(v2, v1)
+
+ninja_g <- igraph::graph_from_data_frame(e, vertices = v) %>% 
+  as_tbl_graph()
+
+rm(list = c('e','v','v1','v2'))
+
+```
+
+
+From this, I can make a graph with lines that depend on the number of occurrences. 
+
+```{r, warning=FALSE, message=FALSE}
+ninja_g %>% 
+  ggraph(layout = 'sugiyama') + 
+  geom_node_point() + 
+  geom_edge_diagonal(aes(color = n, edge_width = n)) + 
+  geom_node_text(aes(label = name, filter = leaf), angle = -90, hjust = 0, nudge_y = -0.02, size = 3) + 
+  geom_node_text(aes(label = name, filter = !leaf), angle = -90, hjust = 1, size = 3, nudge_y = 0.02) + 
+  coord_cartesian(ylim = c(0, 2.5)) + 
+  theme_minimal() + 
+  theme(
+    plot.background = element_rect()
+  )
+```
+
+That's starting to look like something, but there are clear and present dangers. Overlap, at least. 
+
+Maybe it's time I start thinking about an alluvial plot showing obstacle and round, for example. Maybe I should think for a moment about what data I would like to convey. I have relationships between two obstacles (which obstacles are paired with each other), between an obstacle and a round, and between an obstacle and a season. There are only 76 obstacles that repeat more than twice (those shown in the graph above), so the amount of data is manageable. Further numbers: seven rounds (excluding parentheticals), ten seasons. 
+
+I might show the relationships between obstacles and rounds and seasons with a single graph. Down the middle is a line of obstacles; to the left, an edge is drawn to every season that obstacle appears; to the right, an edge is drawn to every round that obstacle appears in. Doing this in `igraph` sounds potentially tricky... I'm not sure how to do that. 
+
+Actually, what I just described is an alluvial plot from season to obstacle to round. Okay, game on. Let's make an alluvial plot. Already I have a simple one: 
+
+```{r}
+library(ggalluvial)
+
+ninja_alluv <- ninja %>% 
+  group_by(round_stage, obstacle_name) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  filter(n > 2) %>% 
+  rename(from = round_stage, to = obstacle_name) %>% 
+  ungroup()
+
+ninja_alluv %>% 
+  ggplot(aes(axis1 = from, axis2 = to, y = n)) + 
+  geom_alluvium(aes(fill = from)) + 
+  geom_stratum(width  = 1/12) + 
+  scale_fill_brewer(type = 'div', palette = 6) +
+  theme_void()
+```
+
+Definitely not my favorite type of visualization, but it conveys more information than I can convey with a simple `igraph`, and for that it's fairly convenient. There's a really good alluvial chart from the Economist. Adding it to my inspiration board. 
+
+## Obstacle-to-obstacle
+A more complex graphic might exploit obstacle-to-obstacle relationships. This is trickier to make. The dataset would be composed of every neighbor relationship. I could use icons for the points themselves pretty easily, then I could relate many of the objects. 
+
+To construct the dataset, I will need every object and every object that follows it. This should cover every relationship of before and after. 
+
+I could accomplish this, perhaps, by creating a lead variable, grouping on season and round stage.
+
+```{r, message=FALSE, warning=FALSE}
+ninja_next <- ninja %>% 
+  group_by(season, round_stage) %>% 
+  mutate(
+    next_obstacle = lead(obstacle_name, default = "End")
+  ) %>% 
+  group_by(obstacle_name, next_obstacle) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n))
+```
+
+Looks good! If an object is the last one, its follower is called 'End'. Let's see if this will convert to a graph. 
+
+```{r}
+ninja_next %>% 
+  graph_from_data_frame(directed = FALSE) %>% 
+  as_tbl_graph() %>% 
+  ggraph() + 
+  geom_node_point() + 
+  geom_edge_link()
+```
+
+Egad, that's cool. It's almost generative, and reminds me of the mud cracks drawings in my inspiration file. I need some way to color the nodes, or perhaps just fewer points and add labels. I could separate everything by round, I suppose. 
+
+```{r, warning=FALSE, message=FALSE}
+e <- ninja %>% 
+  group_by(season, round_stage) %>% 
+  mutate(
+    next_obstacle = lead(obstacle_name, default = "End")
+  ) %>% 
+  group_by(obstacle_name, next_obstacle, round_stage) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  ungroup() 
+
+v <- ninja %>% 
+  select(name = obstacle_name) %>% unique() %>% 
+  rbind(data.frame(name = 'End'))
+
+ninja_next <- graph_from_data_frame(e, vertices = v) %>% as_tbl_graph()
+
+ninja_next %>% 
+  ggraph() + 
+  geom_node_point(size = 0.75) + 
+  geom_edge_link(aes(color = round_stage), 
+                 arrow = arrow(length = unit(4, 'pt'),
+                               type = 'closed')) + 
+  scale_edge_color_brewer(type = 'qual', palette = 3) + 
+  theme_void()
+
+
+```
+
+This is fine, but it leaves the problem of the nodes. Some nodes appear in more than one stage, but this shouldn't stop me from seeing only those nodes that appear in a certain round/stage. But the placement of nodes... In fact, I'm not sure how the nodes are placed anyway. I should choose a layout. The default chosen layout is stress. 
+
+Linear with arcs? 
+
+```{r}
+ninja_next %>% 
+  ggraph(layout = 'linear') + 
+  geom_node_point() + 
+  geom_edge_arc(aes(color = round_stage, alpha = ..index..), 
+                 arrow = arrow(length = unit(4, 'pt'))) + 
+  scale_edge_alpha('Edge direction', guide = 'edge_direction') + 
+  scale_edge_color_brewer(type = 'qual', palette = 3) + 
+  theme_void()
+```
+
+Impossible to make any sense out of this. Back to 'stress'. I'm just going to play with it and run with it. 
