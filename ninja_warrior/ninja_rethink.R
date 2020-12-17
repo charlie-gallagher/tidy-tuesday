@@ -7,7 +7,7 @@ library(tidygraph)
 library(ggraph)
 
 library(extrafont)
-library(g)
+library(ggimage)
 library(cowplot)
 
 # Get data -------
