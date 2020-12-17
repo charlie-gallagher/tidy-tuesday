@@ -7,7 +7,8 @@ library(tidygraph)
 library(ggraph)
 
 library(extrafont)
-library(ggimage)
+library(g)
+library(cowplot)
 
 # Get data -------
 rm_paren <- "\\s?\\(.*\\)\\s?"  # Remove parentheses with optional spaces
@@ -47,21 +48,21 @@ season_plots <- purrr::map(season, function(seas) {
   ninja_next %>% 
     ggraph(layout = 'sugiyama') + 
     geom_edge_link(aes(filter = season != seas,
-                      start_cap = label_rect(from_name),
-                      end_cap = label_rect(to_name)), edge_width = 0.5,
-                  arrow = arrow(length = unit(4, 'mm'), angle = 10, type = 'closed'),
-                  color = "#f3714dff") + 
+                       start_cap = label_rect(from_name),
+                       end_cap = label_rect(to_name)), edge_width = 0.5,
+                   arrow = arrow(length = unit(4, 'mm'), angle = 10, type = 'closed'),
+                   color = "#f3714dff") + 
     geom_edge_link(aes(filter = season == seas,
-                      start_cap = label_rect(from_name),
-                      end_cap = label_rect(to_name)), edge_width = 1,
-                  arrow = arrow(length = unit(4, 'mm'), angle = 10, type = 'closed'),
-                  color = "white") + 
+                       start_cap = label_rect(from_name),
+                       end_cap = label_rect(to_name)), edge_width = 1,
+                   arrow = arrow(length = unit(4, 'mm'), angle = 10, type = 'closed'),
+                   color = "white") + 
     geom_node_text(aes(label = name, size = n), color = 'white') +
-    geom_image(data = NULL, aes(x = 6, y = 10.75, image = 'brush_stroke_1.png'),
+    geom_image(data = NULL, aes(x = 6, y = 11.25, image = 'brush_stroke_1.png'),
                size = 0.5) +
-    geom_text(data = NULL, aes(x = 6, y = 11.2, label = paste("Season", seas)),
+    geom_text(data = NULL, aes(x = 6, y = 11.6, label = paste("Season", seas)),
               color = 'white', size = 10, family = 'Roboto Lt') +
-    geom_text(data = NULL, aes(x = 6, y = 10.8, label = "First Stage - National Finals"),
+    geom_text(data = NULL, aes(x = 6, y = 11.2, label = "First Stage - National Finals"),
               color = 'white', size = 5, family = 'Roboto Lt') +
     labs(caption = "Source: Sasukepedia    |    Visualization: @charliegallaghr") + 
     scale_edge_color_brewer(type = 'seq', palette = 2) +
@@ -76,6 +77,7 @@ season_plots <- purrr::map(season, function(seas) {
       plot.caption = element_text(color = 'white', family = 'Roboto Lt', size = 10,
                                   hjust = 0.9, margin = margin(0, 0, 10, 0))
     ) + 
+    draw_image("nw_logo_1.png", x = 7.5, y = -0.5, width = 4, height = 4) + 
     ggsave(season_filenames[seas], height = 11, width = 8.5, dpi = 'retina')
 })
 
