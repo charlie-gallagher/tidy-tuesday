@@ -1,17 +1,18 @@
 library(tidyverse)
-library(lubridate)
+library(lubridate)   # as_datetime
 library(extrafont)
 
 big_mac <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-12-22/big-mac.csv')
 
-
+# Generate in-betweens ------
 big_mac_inbetween <- big_mac %>% 
   group_by(iso_a3) %>% 
   mutate(
-    date = as.numeric(as_datetime(date)),
-    ylead = lead(usd_adjusted),
-    xlead = lead(date),
-    xzero = -((usd_adjusted * (xlead - date)) / (ylead - usd_adjusted)) + date,
+    date = as.numeric(as_datetime(date)),  # easier to interpolate a numeric var
+    usd_lead = lead(usd_adjusted),
+    date_lead = lead(date),
+    # Solving for x given two points and y = 0
+    xzero = -((usd_adjusted * (date_lead - date)) / (usd_lead - usd_adjusted)) + date, 
     xzero_valid = xzero > date & xzero < xlead,
     yzero = 0,
     xzero = replace(xzero, !xzero_valid, NA),
@@ -21,7 +22,7 @@ big_mac_inbetween <- big_mac %>%
   filter(!is.na(xzero)) %>% 
   select(date = xzero, name, usd_adjusted = yzero)
 
-
+# Append to existing data -----
 big_mac_area <- big_mac %>% 
   mutate(date = as.numeric(as_datetime(date))) %>% 
   select(date, name, usd_adjusted) %>% 
@@ -29,6 +30,7 @@ big_mac_area <- big_mac %>%
   mutate(date = as_datetime(date)) %>% 
   filter(!is.na(usd_adjusted) & name != "United States")
 
+# Make facet panel titles dataset --------
 big_mac_area_titles <- big_mac_area %>% 
   select(name) %>% unique() %>% 
   mutate(x = as_datetime(ymd('2016-01-01')), y = 1.18)
