@@ -68,4 +68,4 @@ big_mac_area %>%
     panel.spacing.x = unit(2.7, 'lines'),
     panel.spacing.y = unit(2, 'lines'),
     strip.text = element_blank(),
-  ) + ggsave('test.png', width = 10, height = 12)
+  ) + ggsave('bigmac.png', width = 10, height = 12, dpi = 'retina')
