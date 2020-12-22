@@ -1,0 +1,268 @@
+---
+title: "Bic Mac Index"
+output: html_notebook
+---
+
+Exciting, some economics data. A good break after last week's dataset. 
+
+```{r include=FALSE, message=FALSE}
+library(tidyverse)
+library(lubridate)
+```
+
+
+```{r}
+big_mac <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-12-22/big-mac.csv')
+```
+
+```{r}
+skimr::skim(big_mac)
+```
+
+
+One of the basic calculations is the number of big macs a dollar could buy in that foreign country. This is in the dataset as `dollar_price`. I can calculate it because I have the price of a big mac in local currency and the price of a dollar in local currency. 
+
+So, if the big mac costs x in local currency, and the dollar is worth y units of that same currency, then how much is a big mac in dollars? We can multiply the number of foreign units per big mac by the number of dollars per foreign units to get only dollars per big mac. 
+
+```{r}
+big_mac %>% 
+  mutate(
+    e = 1 / dollar_ex,
+    bmpd = e * local_price
+  ) %>% 
+  select(date, iso_a3, local_price, e, dollar_price, bmpd)
+```
+
+
+Well at least I can do basic currency conversions. I probably won't have as much time as I usually do to work on this, so I should be diligent about planning the graphic. I'll probably make a close-to-full mock-up once I know what data I want to display. 
+
+# The Data
+The data is time-series for multiple countries, running from April 2000, to July 2020. The data is gathered unevenly, but usually twice a year. Let's look at some countries' data. 
+
+```{r}
+big_mac %>% 
+  filter(iso_a3 %in% c("USA", "SWE", "AUS")) %>% 
+  ggplot(aes(x = date, y = dollar_price, group = iso_a3)) + 
+  geom_line(aes(color = iso_a3)) + geom_point() + 
+  geom_rug() + 
+  scale_x_date(date_breaks = "year", date_minor_breaks = "year") + 
+  labs(title = "Distribution of Dates") + 
+  theme_bw() + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5)
+  )
+```
+
+This is a selection of lines and a rug plot for all of them. The important thing to notice about the rug plot is the x-axis. All date observations occur on the same dates, and they are mostly unevenly spaced until June 2011, at which point they begin to occur on January 1 and July 1 until July 2020. Here's a list of dates. 
+
+```{r}
+big_mac %>% 
+  janitor::tabyl(date)
+```
+
+
+This is fairly clear, but it's hard to find a pattern in the early dates. Also, the early dates have fewer observations than the later ones, so some countries evidently only have data for some of the dates. That's generally okay. Now, some more key terms. 
+
+**Overvalued** The currency costs too much relative to its purchasing power; the cost of a big mac in that country is greater than the cost of a big mac in America. 
+
+**Undervalued** The currency is too cheap relative to its purchasing power; the cost of a big mac in that country is less than the cost of a big mac in America. 
+
+**Big Mac Exchange Rate** The exchange rate that would exist if a big mac cost the same in local dollars as it did in US dollars. If the Big Mac exchange rate is less than the average exchange rate, the currency is 'undervalued'. In other words, the dollar has too much buying power, and hence can buy more big macs. 
+
+What is the adjusted index? What is the variable `adj_price`? The latter is easier to answer. The `adj_price` is the GDP-adjusted price of a Big Mac, in dollars. This accounts for the trend that the price of a Big Mac increases with GDP. 
+
+
+```{r}
+big_mac %>% 
+  ggplot(aes(x = gdp_dollar, y = dollar_price)) + geom_point(size = 0.5) + 
+  geom_smooth(method = 'lm', se = FALSE) + 
+  labs(title = "Price of a Big Mac", 
+       subtitle = "as a function of GDP per capita") +
+  theme_bw()
+```
+
+This is a linear model showing Big Mac price in dollars as a function of GDP. As you can see, this linear model does a fairly good job explaining the relationship between GDP and big mac prices. The above graph shows the prices over the entire time series; for only 2020, you get the following graph: 
+
+```{r}
+bm_usd_2020 <- big_mac %>% 
+  filter(iso_a3 == "USA" & date == ymd('2020-01-14')) %>% 
+  pull(dollar_price)
+
+big_mac %>% 
+  filter(date == ymd('2020-01-14')) %>% 
+  ggplot(aes(x = gdp_dollar, y = dollar_price)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = 'lm', se = FALSE) + 
+  geom_hline(yintercept = bm_usd_2020, linetype = 'dashed', size = 1, color = grey(0.5)) + 
+  annotate('text', x = 20000, y = 6.5, label = "Big Mac price in dollars") +
+  annotate('curve', x = 31000, xend = 38000, y = 6.5, yend = 5.8, curvature = -.35, 
+           arrow = arrow(length = unit(3, 'mm'), angle = 20, type = 'closed')) + 
+  annotate('text', x = 55000, y = 3.5, label = "GDP Adj. Big Mac price\nin dollars", hjust = 0) +
+  annotate('curve', x = 54000, y = 3.5, xend = 45000, yend = 4.25, curvature = -.35,
+           arrow = arrow(length = unit(3, 'mm'), angle = 20, type = 'closed')) + 
+  theme_bw()
+```
+
+The GDP-adjusted price of a Big Mac uses the residuals of this model to determine the difference in price valuation. For example, if the predicted price, given a certain GDP, is \$4, and the local market price is \$3, then the currency is undervalued even accounting for changes in GDP. 
+
+
+Now every variable has been explained. The variables `[currency]_raw` and `[currency]_adjusted` give the index of the country relative to `[currency]`. The potential currencies are: US Dollar, Euro, Great British Pound, Japanese Yen, and the Chinese Yuan. These variables can be derived from the data with the appropriate country's data. You need the exchange rate between the two countries, the price of a Big Mac in the reference country, and the price of a big mac in the comparison country. 
+
+
+# Ideas for a Graphic
+So, how do I visualize the data for between 28 and 56 countries between 2000 and 2020? Spark lines are an obvious choice, as are small multiples in general. Let's look at some lines then for the countries I have. 
+
+
+```{r}
+big_mac %>% 
+  ggplot(aes(x = date, y = usd_raw)) + 
+  geom_area(aes(fill = usd_raw >= 0)) + 
+  geom_line() + 
+  facet_wrap(vars(iso_a3)) + 
+  theme_void()
+```
+
+Naturally, `geom_area` has a hard time filling observations where the line crosses an axis, so the results are a little weird. Is there a simple way to correct this? The problem is that the area chart has to choose what color to color the in-betweens, the areas between points. I would need to add an observation every time a time series shifts from positive to negative, with x interpolated to the exact moment the line crosses the boundary. This is a pretty simple interpolation problem, I think. Let's make a basic example. 
+
+
+```{r}
+df <- data.frame(
+  x = seq(0, 20, 2),
+  y = round(runif(n = 11, min = -1, max = 1), 2)
+)
+
+ggplot(df, aes(x = x, y = y)) + 
+  geom_line() + geom_point() + geom_hline(yintercept = 0)
+```
+
+If I use `geom_area` here, it won't work. 
+
+```{r}
+ggplot(df, aes(x = x, y = y)) + 
+  geom_area(aes(fill = y > 0)) +
+  geom_line() + geom_point() + geom_hline(yintercept = 0)
+```
+
+If I can introduce points that interpolate between those points that switch between above and below zero on the y-axis, then the plot will be fixed. How to do this, though? There's an equation for it that I just derived (clumsily... need to re-up on my algebra skills). When y = 0, the formula for x is: 
+
+```raw
+x = -((y1 * (x2 - x1)) / (y2 - y1)) + x1
+```
+
+
+```{r}
+df %>% 
+  mutate(
+    ylead = lead(y),
+    xlead = lead(x),
+    xzero = -((y * (xlead - x)) / (ylead - y)) + x,
+    xzero_valid = xzero > x & xzero < xlead
+  ) %>% 
+  ggplot() + 
+  geom_line(aes(x = x, y = y)) + geom_point(aes(x = x, y = y)) +
+  geom_point(aes(x = xzero, y = 0, color = xzero_valid)) 
+```
+
+Ah good. Now, to incorporate these points back into the dataset, I pivot longer and combine the columns. 
+
+
+```{r}
+df <- data.frame(
+  x = seq(0, 20, 2),
+  y = round(runif(n = 11, min = -1, max = 1), 2)
+)
+
+df_inbetween <- df %>% 
+  mutate(
+    ylead = lead(y),
+    xlead = lead(x),
+    xzero = -((y * (xlead - x)) / (ylead - y)) + x,
+    xzero_valid = xzero > x & xzero < xlead,
+    yzero = 0,
+    xzero = replace(xzero, !xzero_valid, NA),
+    yzero = replace(yzero, !xzero_valid, NA)
+  ) %>% 
+  select(x = xzero, y = yzero) %>% filter(!is.na(x))
+
+df <- rbind(df, df_inbetween)
+
+df %>% 
+  ggplot(aes(x = x, y = y)) + 
+  geom_area(aes(fill = y > 0)) +
+  geom_line() + geom_point() +
+  geom_hline(yintercept = 0)
+```
+
+Well that was a huge let-down. It works perfectly with values below zero and not at all for values above zero. A solution was proposed in [this](https://stackoverflow.com/questions/17959817/filling-area-under-curve-based-on-value) Stack Exchange post. 
+
+
+```{r}
+# create some fake data with zero-crossings
+yvals = c(2,2,-1,2,2,2,0,-1,-2,2,-2)
+d = data.frame(x=seq(1,length(yvals)),y=yvals)
+
+rx <- do.call("rbind",
+   sapply(1:(nrow(d)-1), function(i){
+   f <- lm(x~y, d[i:(i+1),])
+   if (f$qr$rank < 2) return(NULL)
+   r <- predict(f, newdata=data.frame(y=0))
+   if(d[i,]$x < r & r < d[i+1,]$x)
+      return(data.frame(x=r,y=0))
+    else return(NULL)
+ }))
+ d2 <- rbind(d,rx)
+ ggplot(d2,aes(x,y)) + geom_area(data=subset(d2, y<=0), fill="pink") 
+     + geom_area(data=subset(d2, y>=0), fill="lightblue") + geom_point()
+```
+
+
+This is just horrific to look at and try to figure out. The essence, though, is that you do two geom_areas, one for the data where y<=0 and one where y>=0 (notice how they both contain y=0). 
+
+```{r}
+df %>% 
+  ggplot(aes(x = x, y = y)) + 
+  geom_area(data = filter(df, y>=0), fill = 'pink') +
+  geom_area(data = filter(df, y<=0), fill = 'light blue') +
+  geom_line() + geom_point() +
+  geom_hline(yintercept = 0)
+```
+
+And voila... It's not the best, but it'll do. Let's adapt this to the burger data. The problem is x-values for burgers are dates, not raw numerics. But I think I can easily convert. 
+
+
+```{r}
+big_mac_short <- big_mac %>% 
+  select(date, iso_a3, usd_raw) %>% 
+  mutate(
+    date = as.numeric(as_datetime(date))
+  )
+
+big_mac_short_inbetween <- big_mac_short %>% 
+  group_by(iso_a3) %>% 
+  mutate(
+    ylead = lead(usd_raw),
+    xlead = lead(date),
+    xzero = -((usd_raw * (xlead - date)) / (ylead - usd_raw)) + date,
+    xzero_valid = xzero > date & xzero < xlead,
+    yzero = 0,
+    xzero = replace(xzero, !xzero_valid, NA),
+    yzero = replace(yzero, !xzero_valid, NA)
+  ) %>% 
+  select(date = xzero, iso_a3, usd_raw = yzero)
+
+
+big_mac_area <- rbind(big_mac_short, big_mac_short_inbetween)
+
+big_mac_area %>% 
+  ggplot(aes(x = date, y = usd_raw)) + 
+  geom_area(data = filter(big_mac_area, usd_raw >= 0), fill = 'light blue') + 
+  geom_area(data = filter(big_mac_area, usd_raw <= 0), fill = 'pink') + 
+  facet_wrap(vars(iso_a3)) + 
+  theme_void()
+  
+
+
+```
+
+Since I'm short on time this week, I might be satisfied with this graphic and a more flexible function for generating the inbetweens. 
+
