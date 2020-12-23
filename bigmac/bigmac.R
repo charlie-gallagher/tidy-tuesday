@@ -13,7 +13,7 @@ big_mac_inbetween <- big_mac %>%
     date_lead = lead(date),
     # Solving for x given two points and y = 0
     xzero = -((usd_adjusted * (date_lead - date)) / (usd_lead - usd_adjusted)) + date, 
-    xzero_valid = xzero > date & xzero < xlead,
+    xzero_valid = xzero > date & xzero < date_lead,
     yzero = 0,
     xzero = replace(xzero, !xzero_valid, NA),
     yzero = replace(yzero, !xzero_valid, NA)
