@@ -1,0 +1,535 @@
+---
+title: "Transit Costs Project"
+output: html_notebook
+---
+
+```{r, include = FALSE}
+library(tidyverse)
+```
+
+Data: 
+
+```{r}
+transit_cost <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-01-05/transit_cost.csv', 
+                                col_types = cols(
+  e = col_character(),
+  country = col_character(),
+  city = col_character(),
+  line = col_character(),
+  start_year = col_character(),
+  end_year = col_character(),
+  rr = col_double(),
+  length = col_double(),
+  tunnel_per = col_character(),
+  tunnel = col_double(),
+  stations = col_double(),
+  source1 = col_character(),
+  cost = col_double(),
+  currency = col_character(),
+  year = col_double(),
+  ppp_rate = col_double(),
+  real_cost = col_character(),
+  cost_km_millions = col_double(),
+  source2 = col_character(),
+  reference = col_character()
+))
+
+spec(transit_cost)
+```
+
+
+# The Data
+The unit of observation is the transit line, it looks like. Each line has a start date and a (possibly projected) end date. It also has fairly detailed information on cost and length. Some of the less obvious variables: 
+
+- `e` id
+- `rr` Railroad indicator
+- `tunnel_per` Percent of line completed
+- `tunnel` Km completed so far
+- `length` Expected length
+- `cost` in millions of local currency
+- `year` Midpoint year of construction
+- `ppp_rate` Purchasing power parity based on midpoint of construction
+- `real_cost` Real cost in millions of USD
+
+```{r}
+skimr::skim(transit_cost)
+```
+
+So, 56 countries, 140 cities, 366 unique line names. End year has the most missing values, but only 71. `e` should be a character, not a numeric. Now, why are `start_year`, `end_year`, and `tunnel_per` characters instead of numerics? 
+
+
+```{r}
+janitor::tabyl(transit_cost, start_year)
+```
+
+Just some anomalies. In `start_year`, there are three errant values: "4 years", "5 years", and "not start". In `end_year`, there is one: "x". `tunnel_per` is written with percent signs, so that can be converted easily. Let's fix these real quick. It's not clear what '4 years' means, so I'm going to replace it with NA. 
+
+Another problem I'll fix is that the end of the table features summary statistics. They can be omitted. 
+
+```{r}
+transit_cost <- transit_cost %>% 
+  mutate(
+    start_year = case_when(
+      start_year == '4 years' | start_year == '5 years' | 
+        start_year == 'not start' ~ NA_character_,
+      TRUE ~ start_year
+    ),
+    end_year = replace(end_year, end_year == 'x', NA_character_),
+    tunnel_per = str_extract(tunnel_per, pattern = "\\d*.\\d*"),
+    start_year = as.numeric(start_year),
+    end_year = as.numeric(end_year),
+    tunnel_per = as.numeric(tunnel_per)
+  ) %>% 
+  filter(!is.na(e))
+```
+
+
+# Basic Visuals
+Let's look at some timelines. A quick segment chart showing the start date and end date. 
+
+```{r}
+transit_cost %>% 
+  ggplot() + 
+  geom_segment(aes(x = start_year, xend = end_year, y = e, yend = e)) + 
+  theme_bw() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+```
+
+Most of these projects are incomplete still. Some are exceptionally long running. I like this visualization quite a bit, actually. If I order by start date, I will have something like the graphic I made for wheat crops. 
+
+```{r}
+transit_cost %>% 
+  ggplot() + 
+  geom_segment(aes(x = start_year, xend = end_year, y = reorder(e, desc(start_year)), yend = e)) + 
+  theme_void()
+```
+
+Ooh how cool looking. I would need to make it pretty high definition to make it readable, and even still it isn't the best. Maybe I should group by country or something like that. What would that look like? The y-axis would be ordered by country and start year. 
+
+```{r}
+transit_cost %>% 
+  mutate(y_axis = paste(country, as.character(start_year), sep = '_')) %>% 
+  ggplot() + 
+  geom_segment(aes(x = start_year, xend = end_year, 
+                   y = y_axis, yend = y_axis, color = country)) + 
+  theme_void()
+```
+
+Obviously, with 56 countries, it's hard to see what's going on. Let's facet, maybe? 
+
+```{r}
+transit_cost %>% 
+  mutate(y_axis = paste(country, as.character(start_year), sep = '_')) %>% 
+  ggplot() + 
+  geom_segment(aes(x = start_year, xend = end_year, 
+                   y = start_year, yend = start_year, color = country)) + 
+  facet_wrap(vars(country)) +
+  guides(color = FALSE) + 
+  theme_void()
+```
+
+It's hard to see exactly what's going on, but China (CN) certainly sticks out. 
+
+```{r}
+transit_cost %>% 
+  mutate(y_axis = paste(country, as.character(start_year), sep = '_')) %>% 
+  filter(country == 'CN') %>% 
+  ggplot() + 
+  geom_segment(aes(x = start_year, xend = end_year, 
+                   y = y_axis, yend = y_axis)) + 
+  theme_minimal()
+```
+
+Not only has there been a project every year since 1999, but they almost always finish soon after that. An interesting challenge would be a graphic of a few countries where the line segments are little subway trains. Might be hard given the frequent need for partial trains. Other pictographs would include train tracks or a subway car built from different types of lines. Let me try that really quick.
+
+
+Tools: segments. I can vary the segment type to create different effects, and I can shift the segments slightly north or south to suit. 
+
+```{r}
+data.frame(
+  x = 1, xend = 10,
+  y = 1, yend = 1,
+  lty = '1112'
+) %>% 
+  ggplot() + 
+  geom_segment(aes(x, y, xend = xend, yend = yend), size = 20, lineend = 'round') + 
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend),
+               size = 10, linetype = '1112', color = 'white')
+```
+
+That's not bad... Let's do it for China 
+
+```{r}
+transit_cost %>% 
+  mutate(y_axis = paste(country, as.character(start_year), sep = '_')) %>% 
+  filter(country == 'CN') %>% 
+  ggplot() + 
+  geom_segment(aes(x = start_year, xend = end_year, 
+                   y = y_axis, yend = y_axis), size = 3, lineend = 'round') + 
+  geom_segment(aes(x = start_year, xend = end_year, 
+                   y = y_axis, yend = y_axis), color = 'white', 
+               linetype = '1112', size = 2) + 
+  theme_minimal() + theme(panel.grid.major.x = element_blank(), panel.grid.minor.x = element_blank())
+```
+
+China features an uncommon amount of regularity. I think this will look better with some randomization. Here's the US.
+
+```{r}
+transit_cost %>% 
+  mutate(y_axis = paste(country, as.character(start_year), sep = '_')) %>% 
+  filter(country == 'US') %>% 
+  ggplot() + 
+  geom_segment(aes(x = start_year, xend = end_year, 
+                   y = y_axis, yend = y_axis), size = 5, lineend = 'round') + 
+  geom_segment(aes(x = start_year, xend = end_year, 
+                   y = y_axis, yend = y_axis), color = 'white', 
+               linetype = '1112', size = 3) + 
+  theme_minimal() + theme(panel.grid.major.x = element_blank(), panel.grid.minor.x = element_blank())
+```
+
+Here's the US. I think it looks fairly nice. Can I map the colors of the windows to some variable? Here's Japan.
+
+```{r}
+transit_cost %>% 
+  mutate(y_axis = paste(country, as.character(start_year), sep = '_')) %>% 
+  filter(country == 'JP') %>% 
+  ggplot() + 
+  geom_segment(aes(x = start_year, xend = end_year, 
+                   y = y_axis, yend = y_axis), size = 5, lineend = 'round') + 
+  geom_segment(aes(x = start_year, xend = end_year, 
+                   y = y_axis, yend = y_axis, color = tunnel_per), 
+               linetype = '1112', size = 3) + 
+  scale_color_gradient(low = 'black', high = '#fcd703') + 
+  theme_minimal() + 
+  theme(
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor.x = element_blank()
+  )
+```
+
+That's not a bad idea... I think I'll run with it for now. It's simple but creative, and it's clear. I can add some more information to make it more interesting. But it feels limited. This is looking pretty cool, I think. Here's another look at China.
+
+```{r}
+transit_cost %>% 
+  mutate(y_axis = paste(country, as.character(start_year), sep = '_')) %>% 
+  filter(country == 'CN') %>% 
+  ggplot() + 
+  geom_segment(aes(x = start_year, xend = end_year, 
+                   y = y_axis, yend = y_axis), size = 3, lineend = 'round') + 
+  geom_segment(aes(x = start_year, xend = end_year, 
+                   y = y_axis, yend = y_axis, color = tunnel_per), 
+               linetype = '1112', size = 2) + 
+  scale_color_gradient(low = 'black', high = '#fcd703') + 
+  theme_minimal() + theme(panel.grid.major.x = element_blank(), panel.grid.minor.x = element_blank())
+```
+
+NOTE: Another reason I need to remap is that there can be multiple projects per year. I might summarize total length per year, and incorporate the total amount of time needed to finish those projects, but that's a little hairy. 
+
+I think I need to remap, though, because when you see lengths like this you assume it's railway length. Still, then it becomes unclear where to start the line (zero?). Let me start by looking at lengths. I'm going to make `yend = end_year`, as well, out of curiosity.
+
+
+```{r}
+transit_cost %>% 
+  filter(country == "CN") %>% 
+  ggplot(aes(0, start_year, xend = length, yend = end_year)) + 
+  geom_segment()
+```
+
+That's horrible to look at. I didn't realize China had done so many projects. Maybe a more reasonable choice is the US. 
+
+```{r}
+transit_cost %>% 
+  filter(country == "US") %>% 
+  ggplot(aes(0, start_year, xend = length, yend = end_year)) + 
+  geom_segment(size = 5, lineend = 'round') + 
+  geom_segment(aes(color = tunnel_per), linetype = '1112', size = 2) + 
+  scale_color_gradient(low = 'black', high = '#fcd703')
+  
+```
+
+Definitely better with nice horizontal lines, even for a country with limited projects. 
+
+## Beginning to Build the Graphic
+I have an idea of what I want. I just need to vet the idea to make sure it's valid. Here's the concept. 
+
+>Display each project is a segment of line; the segment is a pictograph of a subway car. The color of the 'windows' is going to represent the percent of the tunnell that's finished already. I will only be able to do one country at a time, so maybe I should have four panels, each its own picture, for four different countries. 
+
+Example: China. 
+
+
+```{r}
+transit_cost %>% 
+  filter(country == 'CN' & !is.na(start_year)) %>% 
+  ggplot(aes(x = start_year, xend = end_year, 
+             y = reorder(e, desc(start_year)), yend = e)) + 
+  geom_segment(size = 3, lineend = 'round') + 
+  geom_segment(aes(color = tunnel_per), 
+               linetype = '1112', size = 2) + 
+  scale_color_gradient(low = 'black', high = '#fcd703') + 
+  theme_minimal() + theme(panel.grid.major.x = element_blank(), panel.grid.minor.x = element_blank())
+```
+
+So, China has had a lot of projects. Let's choose a more manageable subject. 
+
+```{r}
+transit_cost %>% 
+  filter(country == 'CA' & !is.na(start_year)) %>% 
+  ggplot(aes(x = start_year, xend = end_year, 
+             y = reorder(e, desc(start_year)), yend = e)) + 
+  geom_segment(size = 5, lineend = 'round', color = 'black') + 
+  geom_segment(aes(color = tunnel_per), 
+               linetype = '1112', size = 2) + 
+  scale_color_gradient(low = 'black', high = '#fcd703') + 
+  theme_minimal() + theme(panel.grid.major.x = element_blank(), panel.grid.minor.x = element_blank())
+```
+
+Most of the theme is not established yet. This is just a concept. Now, of all the projects, how many below only to China? 
+
+```{r}
+janitor::tabyl(transit_cost, country) %>% arrange(desc(n))
+```
+
+253, or 47%... Man that's a lot. The runner up is India with 29 (5%). 
+
+I'm pretty stuck for a total concept, though. This is a graph, not a full graphic. I'll decide tomorrow. 
+
+
+# The Next Day
+I'm not an immediate fan of the subway look-alike graphic. But the fact that China has started 47% of the projects is significant, and I want to point that out.
+
+I guess an appropriate color scheme would be a subway map scheme, like the colors used in New York or the Underground. Actually, I'm feeling more inspired by a stacked bar chart in my inspiration poster. Let me try to recreate it. 
+
+```{r}
+t_sum <- transit_cost %>% 
+  mutate(
+    not_begun = start_year > 2020 | tunnel_per == 0,
+    begun = start_year <= 2020 & tunnel_per < 100,
+    finished = tunnel_per == 100
+  ) %>% 
+  group_by(country) %>% 
+  summarize(
+    n_not_begun = sum(not_begun, na.rm = TRUE),
+    n_begun = sum(begun, na.rm = TRUE),
+    n_finished = sum(finished, na.rm = TRUE)
+  ) %>% 
+  pivot_longer(cols = c(n_not_begun, n_begun, n_finished)) %>% 
+  mutate(name = factor(name, levels = c('n_not_begun', 'n_begun', 'n_finished')))
+```
+
+
+The original graphic has a black and white color scheme that I like a lot. 
+
+```{r}
+t_sum %>% 
+  # filter(country != 'CN') %>% 
+  ggplot() + 
+  geom_col(aes(x = reorder(country, desc(value)), y = value, 
+               group = country, fill = name), 
+           color = 'white') + 
+  scale_fill_manual(values = grey(c(1, 0.5, 0))) +
+  theme_minimal() +
+  theme(
+    text = element_text(color = 'white'),
+    plot.background = element_rect(color = NA, fill = 'black'),
+    panel.grid = element_blank()
+  )
+```
+
+I think if I do this with panels by continent, it could look very nice. It will be a little hard to fit everything into a small space, but I know who to give credit to. The problem is with scales -- China throws the whole thing off, which is kinda what I want to highlight, but also it's an interesting look at the data as a whole and what stage each country is in. Let me look at freeing the scales for each continent, just to see. 
+
+
+# Merging in Continent Data
+```{r}
+library(countrycode)
+
+# Remake t_sum and merge on 'iso2c', get 'continent'
+
+t_sum <- transit_cost %>% 
+  mutate(
+    not_begun = start_year > 2020 | tunnel_per == 0,
+    begun = start_year <= 2020 & tunnel_per < 100,
+    finished = tunnel_per == 100
+  ) %>% 
+  group_by(country) %>% 
+  summarize(
+    n_not_begun = sum(not_begun, na.rm = TRUE),
+    n_begun = sum(begun, na.rm = TRUE),
+    n_finished = sum(finished, na.rm = TRUE)
+  ) %>% 
+  pivot_longer(cols = c(n_not_begun, n_begun, n_finished)) %>% 
+  mutate(
+    name = factor(name, levels = c('n_not_begun', 'n_begun', 'n_finished'))
+  ) %>% 
+  left_join(select(codelist, iso2c, continent, country_name = country.name.en),
+                    by = c("country" = "iso2c")) %>% 
+  mutate(
+    continent = replace_na(continent, 'Europe'),
+    country_name = replace_na(country_name, 'United Kingdom')
+  )
+```
+
+
+That done, I can facet by continent.
+
+```{r}
+t_sum %>% 
+  ggplot() + 
+  geom_col(aes(x = reorder(country, desc(value)), y = value, 
+               group = country, fill = name), 
+           color = 'white') + 
+  facet_wrap(vars(continent), scales = 'free') + 
+  scale_fill_manual(values = grey(c(1, 0.5, 0))) +
+  theme_minimal() +
+  theme(
+    text = element_text(color = 'white'),
+    plot.background = element_rect(color = NA, fill = 'black'),
+    panel.grid = element_blank(),
+    strip.text = element_text(color = 'white')
+  )
+```
+
+Dangit... I need a better way to visualize such skewed data. A common method is to use a circular bar chart. I could try that I guess. 
+
+
+```{r}
+t_sum %>% 
+  ggplot() + 
+  geom_col(aes(y = reorder(country, value), x = value, 
+               group = country, fill = name), 
+           color = 'white') + 
+  coord_polar() +
+  scale_fill_manual(values = grey(c(1, 0.5, 0))) +
+  theme_minimal() +
+  theme(
+    text = element_text(color = 'white'),
+    plot.background = element_rect(color = NA, fill = 'black'),
+    panel.grid = element_blank(),
+    strip.text = element_text(color = 'white')
+  )
+```
+
+Unfortunately, this distorts the values of every country below China, or to put it another way it overstates the scale of China's 'lead' on the rest of the world. I suppose I could do a normal graphic and just let China reach near the top of the graph. Group the x-axis by continent, have the title go right through China's peak, something like that. 
+
+```{r}
+t_sum %>% 
+  ggplot() + 
+  geom_col(aes(x = reorder(country, as.numeric(factor(continent))), y = value, 
+               group = country, fill = name), 
+           color = 'white') + 
+  scale_fill_manual(values = grey(c(1, 0.5, 0))) +
+  theme_minimal() +
+  theme(
+    text = element_text(color = 'white'),
+    plot.background = element_rect(color = NA, fill = 'black'),
+    panel.grid = element_blank(),
+    strip.text = element_text(color = 'white')
+  )
+```
+
+
+Okay, another option is to make a `treemap` based on continent, each country being a single square, ignoring completely the different types of project (not started, started, etc.). That's a fair amount of reworking the data I think.. but maybe not. Let's find out. 
+
+
+```{r}
+treemap::treemap(t_sum, index = c('continent', 'country'), vSize = 'value', vColor = 'value')
+```
+
+I'll finish this later. 
+
+
+# The Next Day, Again
+So, I could also do a circle pack, although this doesn't give quite as good an idea how much China is producing (there is space between the circles). But it works well with multiple sizes. For this, I'll need a graph instead of a rectangular data frame.
+
+Well, that didn't work. Hm. I'm not going to waste time on it. Let's re-evaluate. 
+
+
+## Re-evaluation
+I have a dataset of the costs of making different transit projects. I have no ideas for how to visualize them, except that I can visualize the number of projects and the proportion of projects in each stage of development. There are no nice-looking comparisons of the data, because China is overwhelmingly dominant in the number of projects. 
+
+I haven't even looked at costs, which is the raison d'etre for the dataset. It seems like looking at costs would miss the point a bit, because most countries only have a few projects. Comparing continents wouldn't make sense. 
+
+Let me remake the graph I had before, but with country names attached, and grouping/ordering by both continent and number of projects. Then I can add a nice few reference lines with text and call it a day. 
+
+
+Basic graphic is this: 
+
+```{r}
+t_sum %>% 
+  ggplot() + 
+  geom_col(aes(x = reorder(country, desc(value)), y = value, 
+               group = country, fill = name), 
+           color = 'white') + 
+  scale_fill_manual(values = grey(c(1, 0.5, 0))) +
+  theme_minimal() +
+  theme(
+    text = element_text(color = 'white'),
+    plot.background = element_rect(color = NA, fill = 'black'),
+    panel.grid = element_blank()
+  )
+```
+
+To group by continent, I can reorder by continent. 
+
+```{r}
+t_sum %>% 
+  ggplot() + 
+  geom_col(aes(x = country, y = value, 
+               group = country, fill = continent), 
+           color = 'white') + 
+  # scale_fill_manual(values = grey(c(1, 0.5, 0))) +
+  theme_minimal() +
+  theme(
+    text = element_text(color = 'white'),
+    plot.background = element_rect(color = NA, fill = 'black'),
+    panel.grid = element_blank()
+  )
+```
+
+
+`reorder` can help here for assigning an order to the countries. 
+
+```{r}
+xf <- factor(as.character(1:10))
+reorder(xf, 10:1)
+```
+
+```{r}
+t_sum %>% 
+  mutate(
+    country = reorder(country, desc(value)) # Makes factor and reorders
+  ) %>% 
+  ggplot() + 
+  geom_col(aes(x = country, y = value, 
+               group = country, fill = continent), 
+           color = 'white') + 
+  theme_minimal() +
+  theme(
+    text = element_text(color = 'white'),
+    plot.background = element_rect(color = NA, fill = 'black'),
+    panel.grid = element_blank()
+  )
+```
+
+That works well. Because `reorder` takes a numeric argument, I don't know how to order by both continent and value without generating a numeric variable that takes a value for each continent and country. Not such a problem. I can assign a numeric value to each continent and add it to the value of `value`. 
+
+```{r}
+t_sum %>% 
+  mutate(
+    continent = factor(continent),
+    cont_value = 1000 * as.numeric(continent) + value,
+    country = reorder(country, desc(cont_value)) # Makes factor and reorders
+  ) %>% 
+  ggplot() + 
+  geom_col(aes(x = country, y = value, 
+               group = country, fill = name), 
+           color = 'white') + 
+  scale_fill_manual(values = grey(c(1, 0.5, 0))) +
+  theme_minimal() +
+  theme(
+    text = element_text(color = 'white'),
+    plot.background = element_rect(color = NA, fill = 'black'),
+    panel.grid = element_blank()
+  )
+```
+
+Nice. So then all I have to do is make it look nice. 
