@@ -2,6 +2,12 @@
 [Tidy Tuesday](https://github.com/rfordatascience/tidytuesday) is "a weekly data project aimed at the R ecosystem." I store my own contributions in this repo. All my contributions can also be seen on my twitter: [@charliegallaghr](https://twitter.com/CharlieGallaghr). 
 
 # Gallery
+## 2021
+### Week 1
+![Transit costs](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/transit_costs/transit_costs.png)
+
+## 2020
+
 ### Week 52
 ![Big Mac Index](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/bigmac/bigmac.png)
 
