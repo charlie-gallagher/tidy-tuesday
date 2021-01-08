@@ -112,17 +112,17 @@ p1 <- t_sum %>%
                group = country, fill = name), 
            color = '#dddddd', size = .25) + 
   geom_text(data = t_sum_text, aes(x = country, y = y, label = country_name),
-            color = '#444444', angle = 90, hjust = 0, nudge_y = 3) +
+            color = '#999999', angle = 90, hjust = 0, nudge_y = 3) +
   geom_segment(data = continent_lines,
-            aes(x = x, xend = xend, y = y, yend = y), color = '#555555') +
+            aes(x = x, xend = xend, y = y, yend = y), color = '#666666') +
   geom_segment(
     data = pivot_longer(continent_lines, cols = c(x, xend)),
     aes(x = value, xend = value, y = y, yend = y + 5),
-    color = '#555555'
+    color = '#666666'
   ) +
   geom_text(data = continent_lines,
             aes(x = (x + xend) / 2, y = y-5, label = continent),
-            color = '#555555', angle = c(90, rep(0, 3), 90),
+            color = '#999999', angle = c(90, rep(0, 3), 90),
             hjust = c(1, rep(0.5, 3), 1)) +
   labs(
     title = "Transit Projects Across the Globe",
@@ -159,4 +159,4 @@ p1 +
   geom_text(data = legend_df,
             aes(x = 49.5, y = 0.5 * (2 * ymax - 20), label = group),
             color = '#dddddd', hjust = 1, size = 3) + 
-  ggsave('transit_costs.svg', height = 7, width = 11)
+  ggsave('transit_costs.png', height = 7, width = 11)
