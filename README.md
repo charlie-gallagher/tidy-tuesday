@@ -3,6 +3,9 @@
 
 # Gallery
 ## 2021
+### Week 2
+![Tate Art Collection](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/art_collections/art_collection.png)
+
 ### Week 1
 ![Transit costs](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/transit_costs/transit_costs.png)
 
