@@ -1,0 +1,362 @@
+---
+title: "Art Collection"
+output: html_notebook
+---
+
+```{r, message=FALSE}
+library(tidyverse)
+
+artwork <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-01-12/artwork.csv')
+artists <- readr::read_csv("https://github.com/tategallery/collection/raw/master/artist_data.csv")
+```
+
+
+This week's data is from the Tate Art Museum. "Tate is a family of four art galleries in London, Liverpool and Cornwall known as Tate Modern, Tate Britain, Tate Liverpool and Tate St Ives." (From the [Tate website](https://www.tate.org.uk/).)
+
+The two datasets are `artwork` and `artists`. The first contains data on the artwork in the Tate collections (e.g. artist, title, date, medium). The second contains data specific to each artist (gender, birth year, birth place, etc.). 
+
+This time, I really want to work on spacing within the graphic. What size for the margins and how is the data displayed. That was lacking in my last graphic.
+
+```{r}
+skimr::skim(artwork)
+```
+
+69,201 observations. I'm missing all the data for `thumbnailCopyright`. The ID variables are complete, as are the basic metadata about each work. Among the least complete are depth and inscription (each with over 60,000 missing). The other variables are fairly complete. Let's look at the artist data. 
+
+```{r}
+skimr::skim(artists)
+```
+
+There are 3,532 observations (unit is the artist). Only name and ID are complete; the most incomplete are place and year of death.
+
+# On graphics
+I substantially expanded my inspiration board with images I think use space well. I think my last graphic was weakened by its scaling. I probably could have used smaller lines and text, introduce some negative space. The bar in the middle doesn't lend itself so well so such things. I remade it and called it `transit_costs_redux.png`. 
+
+Of course, 'too small' is a common enough mistake in graphics. You have to make some things very clear, and with other things you can get away with a certain amount of illegibility. Lots of graphics I like feature a certain amount of very small text. 
+
+It depends on the purpose of the graphic, you often get good results from using a fineliner-sized outline on most things. Thick lines don't come off as well. A crisp, fine line is much more pleasing to my eyes. 
+
+# Back to thoughts about this graphic
+Okay, for this week, I don't know what I'm going to do. I don't have a lick of inspiration yet. In a blog post, one data visualization person found that most of the artworks are from William Turner. Apparently this guy really made a lot of art (almost 40,000 works in the Tate collection alone). Let me confirm this. 
+
+```{r}
+janitor::tabyl(artwork, artist) %>% arrange(desc(n)) %>% head()
+```
+
+So, 39,389 works by Turner, 1,046 by George Jones. EVeryone else has fewer than 623. There were 338 works attributed to "British (?) School". Another weird observation: "British School 18th century". 
+
+Let's look at the date variables, which I know are a little messy. 
+
+Acquisition year is fairly complete (missing 46). `dateText` is very messy. It's like what you see on the little placard by a work of art. There is a generated year variable, but the year should be considered ballpark. 
+
+```{r}
+ggplot(artwork) +
+  geom_histogram(aes(x = acquisitionYear))
+```
+
+So, just after 1850, most of the artwork was acquired. I wonder how this is composed? Let's get more fine-grain. 
+
+```{r}
+artwork %>% 
+  group_by(acquisitionYear) %>% summarize(n = n()) %>% 
+  ggplot() + 
+  geom_point(aes(x = acquisitionYear, y = n), size = 2, alpha = 0.3) + 
+  geom_text(aes(x = replace(acquisitionYear, n < 1000, NA), 
+                y = n, label = acquisitionYear),
+            nudge_x = -2, size = 3, hjust = 1)
+```
+
+It was a single year acquisition of almost 40,000 works. Which artists are represented? 
+
+```{r}
+artwork %>% filter(acquisitionYear == 1856) %>% janitor::tabyl(artist) %>% 
+  arrange(desc(n))
+```
+
+The Turner collection was indeed the lion's share of the works acquired that year. They did, however, acquire other works that year. Other big years: 1888, 1975, and 1997. 
+
+```{r}
+for (i in c(1888, 1975, 1997)) {
+  artwork %>% filter(acquisitionYear == i) %>% janitor::tabyl(artist) %>% 
+  arrange(desc(n)) %>% head(n = 20) %>% print()
+}
+
+rm(i)
+```
+
+The other 'large' acquisitions were pretty small. They acquired 1,038 works by George Jones in 1888, 388 apparently anonymous works in 1997. No preference for one artist was shown in 1975. 
+
+
+Let's put out some ideas. One approach, taken by Florian Krautli, is to plot the artists' birth years with bubbles representing each artist and the number of works in the collection. Other time-based approaches are plotting by year the artwork was (believed to be) created in and by year of acquisition. Some time-based aggregates are: number of works acquired per year, number of works made per year, difference between year of birth and year of acquisition, difference between year of birth and production, between production and acquisition. These last few are a little strange because they imply that there's some meaning behind these. 
+
+I also have dimensions of the artworks. No doubt someone will find out which subjects provoke the largest and smallest works. Let's think about physical attributes of the art. Height, width, orientation (units confirmed all identical). 
+
+```{r}
+artwork %>% group_by(units) %>% 
+  summarize(
+    max_height = max(height, na.rm = TRUE),
+    min_height = min(height, na.rm = TRUE),
+    max_width = max(width, na.rm = TRUE),
+    min_width = min(width, na.rm = TRUE)
+  )
+```
+
+There is a work 37 meters tall, and possibly the same work, 11.9 meters wide. There is one work 6 mm tall, and another 3 mm wide (also perhaps the same). Let me calculate the largest and smallest surface areas. 
+
+```{r}
+artwork %>% 
+  mutate(sa = width * height) %>% 
+  summarize(max_sa = max(sa, na.rm = TRUE), min_sa = min(sa, na.rm = TRUE))
+```
+
+I don't know what I'm doing. I can get the actual works in a second with a filter. 
+
+```{r}
+artwork %>% 
+  mutate(sa = width * height) %>% 
+  filter(width == max(width, na.rm = TRUE) | 
+           height == max(height, na.rm = TRUE) | 
+           width == min(width, na.rm = TRUE) | 
+           height == min(height, na.rm = TRUE) | 
+           sa == max(sa, na.rm = TRUE) | 
+           sa == min(sa, na.rm = TRUE))
+```
+
+So, the superlatives with regard to size are all different. The largest and smallest works are:
+
+Widest: Natural selection, Antony Gormley
+
+Tallest: Not title, Miroslaw Balka
+
+Largest surface area: No title (Table and Four Chairs), Robert Therrien
+
+Smallest: Theme de Ballet, Mesens, E. L. T. 
+
+These are higly prone to error. For example, the smallest work is actually "Collage of corrugated paper, pieces of broken knitting needles, etc., on card, 8 5/8 x 11 5/8 (22 x 29.5)". Basically a full-sized piece. Moving on from the sizes of things. 
+
+I also have medium, which could be used to show popularity of medium over time (creation), popular medium at time of purchase (acquisition). But this is a textual analysis that could be painful to parse. The problem is not the commas, but the inclusion of phrases like "chalk and graphite on paper." I could pull out keywords I know will be there, but this is no guarantee that these media are the prevalent ones in a work. I could split each medium entry into its constituent words with `stringi::stri_split_boundaries()`. That might be interesting, but it will balloon the size of the data. Still, it's a fun challenge. Let's try it. 
+
+This function returns a list of the same length as the character vector passed to it. That is, one list entry per observation. Spaces and punctuation are treated separately, so I should clean them all out with a regular expression. Then, find the most common words. 
+
+```{r}
+library(stringi)
+media <- stri_split_boundaries(artwork$medium, type = 'word')
+
+media <- lapply(media, function(x) {
+  x <- tolower(x)
+  x[-grep("(\\s)|([[:punct:]])|(on)|(and)", x)]
+}) %>% do.call(c, .)
+
+
+media_df <- data.frame(medium = media) %>% 
+  group_by(medium) %>% summarize(n = n()) %>% arrange(desc(n))
+
+media_df
+```
+
+This is quite a clean list, actually, except all two-word and three-word phrases are corrupted. Still, pretty clean. The top 10 aren't surprising, especially considering Turner's influence (most of his works were paper). 
+
+Is there any relationship between the medium and the year of creation? Let's look at three popular media: graphite, oil, lithograph. 
+
+```{r}
+artwork %>% 
+  mutate(
+    graphite = grepl("graphite", medium, ignore.case = TRUE),
+    oil = grepl("oil", medium, ignore.case = TRUE),
+    lithograph = grepl("lithograph", medium, ignore.case = TRUE)
+  ) %>% 
+  filter(!is.na(year), artist != "Turner, Joseph Mallord William") %>% 
+  select(year, graphite, oil, lithograph) %>% 
+  pivot_longer(cols = graphite:lithograph) %>% 
+  filter(value) %>% 
+  ggplot() + 
+  geom_histogram(aes(x = year, group = name, fill = name), alpha = 0.5, position = 'identity')
+```
+
+Oh hey look at that, lithographs only became popular in the last half of the 1900s. Unfortunately, I've seen other people take this tack already. Also many tree plots. Okay, so I've looked at data over time, 
+
+Continuing my search for possible data points to look at, I have grouping options: specific artists, specific content/subject matter, media, years, etc. I have links to 58,000 thumbnails, which is pretty cool. I have extra information on artists, which I could use to group them somehow (place of birth, etc.). Using birth year, I could make a variable for the age of the artist when the artwork was painted. Does the museum collection skew young or old? I know one other Twitter user did this with the age at which an artist had their work acquired by the collection. I guess this assumed they were still alive, but the graphic didn't say. Let me look at artist ages, then. 
+
+```{r}
+library(lubridate)
+
+artist_creation <- artwork %>% 
+  left_join(artists, by = c("artistId" = "id")) %>% 
+  select(artist, year, acquisitionYear, yearOfBirth) %>% 
+  mutate(
+    yearOfBirth = ymd(paste0(yearOfBirth, '-01-01')),
+    ageAtCreation = year - year(yearOfBirth)
+  ) %>% 
+  filter(!is.na(year))
+```
+
+Fairly good results, some problems parsing dates. Let's look at a boxplot of decades for age at creation. 
+
+```{r}
+artist_creation %>% 
+  mutate(
+    year_group = cut(acquisitionYear, breaks = seq(1820, 2020, 25))
+  ) %>% 
+  group_by(year_group) %>% 
+  summarize(age = mean(ageAtCreation, na.rm = TRUE), med_age = median(ageAtCreation, na.rm = TRUE))
+```
+
+Looking at this summary, the odds do not look in my favor. Let's look anyway. 
+
+```{r}
+artist_creation %>% 
+  mutate(year_group = cut(acquisitionYear, breaks = seq(1820, 2020, 25))) %>% 
+  ggplot() + 
+  geom_boxplot(aes(x = year_group, y = ageAtCreation))
+```
+
+Some weird results here (to be expected, I guess). Some old people who appear to be quite a bit over 100 years old, and one person who looks like they're almost -100 years old. That can't be right. If I was going to pursue this tack anyway, I would need to look at the same time at the age range of artists. But I don't think there is very much here. 
+
+Okay, one more try with a finer year grouping variable. 
+
+```{r}
+artist_creation %>% 
+  mutate(year_group = cut(acquisitionYear, breaks = seq(1820, 2020, 5))) %>% 
+  ggplot() + 
+  geom_boxplot(aes(x = year_group, y = ageAtCreation))
+```
+
+It's not so easy to describe this graphic. What would the title be? "Distribution of artist ages when they made the artwork that was acquired in the given year group"? Not so clear on first glance. 
+
+I just need to pick something and work with it. I pick the number of acquisitions per year. 
+
+# The Number of Acquisitions per Year
+This is what I'm going to show. It's a simple prompt, so I can try to make a more interesting graphic if I want. Two people have done this already, Georgios Karamanis and Florian Krautli. Florian broke down acquisitions by artist (size of bubble mapped to number of works acquired). Georgios mapped the number of acquisitions to the area of a square with no further information. I have some room to move around in, then. There are only a few years that stick out. All the others have fairly tame numbers. I was thinking about a streamgraph, maybe with different media at creation or acquisition. Agh. Unfortunately, the `streamgraph` package isn't on CRAN. 
+
+I would like to use some categorical variable by which to break up the individual pieces (whatever they are). I could use artist nationality, but this invites a lot of categories. I could restrict to certain nationalities, or see if there is any relationship between nationality and time for certain British allies and enemies (France, Germany, Switzerland, whatever). 
+
+Let's try that then. 
+
+Oh boy, I just looked at the place of birth data. One just says 'Polska'. Let's make a list. 
+
+```{r}
+pull(artists, placeOfBirth) %>% unique() %>% length()
+```
+
+1,264 places of birth. Let's look at the most common. 
+
+```{r}
+artists %>% 
+  janitor::tabyl(placeOfBirth) %>% arrange(desc(n)) %>% head(n = 25)
+```
+
+Those without any commas:
+
+```{r}
+artists %>% 
+  janitor::tabyl(placeOfBirth) %>% arrange(desc(n)) %>% 
+  filter(!grepl(",", placeOfBirth)) %>% 
+  head(n = 25)
+```
+
+Okay, so they are largely in the native language. That shouldn't stop me from making a list. Let's make a new variable with only countries. 
+
+```{r}
+artists <- artists %>% 
+  mutate(
+    birth_country = case_when(
+      grepl(",", placeOfBirth) ~ stringr::str_extract(placeOfBirth, "(?<=, ).*$"),
+      TRUE ~ placeOfBirth
+    )
+  )
+```
+
+This seems to have worked very cleanly. Now, where are they all from? 
+
+```{r}
+janitor::tabyl(artists, birth_country) %>% nrow()
+```
+
+132 countries. Fair enough. Most common are:
+
+```{r}
+janitor::tabyl(artists, birth_country) %>% arrange(desc(n)) %>% head(n = 25)
+```
+
+I suppose I should merge in with `countrycode` to find out which are strictly European. Again, I have options: group by continent? limit to a few countries? Anyway, imagine I make a graphic with the share of the artworks from each country. I could standardize by reporting not the number of artworks from each country but the number of artists from each country. This only goes so far, I admit, as acquiring one work from a German artist should not be equivalent to acquiring 2,000 works by an English one. 
+
+Let's get into it. Most artists come from the UK, US, France, Germany, or Italy. 
+
+```{r}
+frequent_countries <- c("United Kingdom", "United States", "France",
+                        "Deutschland", "Italia")
+
+artwork_countries <- artwork %>% 
+  left_join(select(artists, id, birth_country), by = c("artistId" = "id")) %>% 
+  filter(birth_country %in% frequent_countries)
+```
+
+Looking at works of art from each country as a share of total works acquired in a 5-year block: 
+
+```{r}
+artwork_countries %>% 
+  mutate(year_group = cut(acquisitionYear, breaks = seq(1820, 2020, 5))) %>% 
+  group_by(year_group, birth_country) %>% 
+  summarize(n = n()) %>%
+  group_by(year_group) %>% mutate(pct_year = round(100 * (n / sum(n)), digits = 1)) %>% 
+  ggplot() + 
+  geom_col(aes(x = year_group, y = pct_year, 
+               group = birth_country, fill = birth_country)) + 
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
+
+Okay, I've decided on my idea. 
+
+# The Idea
+It's going to be a waffle chart of countries whose works have been acquired, over time. So, first I need to make the basic waffle chart, then I can worry about coloring things properly. 
+
+```{r}
+artwork %>% 
+  left_join(select(artists, id, birth_country), by = c("artistId" = "id")) %>% 
+  group_by(year_group) %>% 
+  summarize(n = n(), n_country = length(unique(birth_country)))
+```
+
+Ah see this is close, but not what I need. I need to know the number of countries that have not appeared before. This is somewhat hard to convert to a `summarize` command. The data should be: if a country has appeared before, don't count it. 
+
+Hm. This is a stumper. I guess I'll make an indicator for whether the country has been seen, and then summarize by adding this. Would it be easier to mark the year when each country first appeared? I could probably do that easily enough. 
+
+```{r}
+artwork <- artwork %>% 
+  left_join(select(artists, id, birth_country), by = c("artistId" = "id"))
+
+artwork %>% group_by(birth_country) %>% 
+  summarize(first_year = min(acquisitionYear, na.rm = TRUE))
+```
+
+So that's easy enough... There should be an R-like way to do this more efficiently. Also, I think I have to reconsider my data. I need a firm goal before I start moving towards it. 
+Well, shit. I can't use `waffle` because I have to install it from source and that's not something I'm able to do without going through a whole thing. Dangit. Well, the requirements of the data might put it beyond the `waffle` package anyway. It's just going to be a lot of leg work. 
+
+For each year, there will be one observation for every country that has appeared so far. The variables will be 'country', 'acquired in current year', and 'new this year'. Let's just get that much, and I'll have to build my own grid of squares. The location of a country in the tower of squares never changes, so I have that on my side. But I will need to plot one geom for every country. Okay, what about dots? Each country gets a coordinate. That coordinate gets a point if its been acquired before and nothing if it hasn't. It's a filled point if it was acquired that year, empty otherwise. That should work fine. 
+
+Okay, a fully-interacted data frame of countries and years. Then, remove all countries whose 'first appearance' year is after the current year. That won't include information about each year's acquisitions, though. I will have to do that separately. 
+
+```{r}
+countries <- artists %>% arrange(birth_country) %>% pull(birth_country) %>% unique()
+years <- artwork %>% arrange(acquisitionYear) %>% pull(acquisitionYear) %>% unique()
+
+full_year_country <- expand.grid(list(country = countries, year = years))
+```
+
+With that, I can convert to data.frame and merge in first year data and acquisition countries data. 
+
+```{r}
+first_years <- artwork %>% group_by(birth_country) %>% 
+  summarize(first_year = min(acquisitionYear, na.rm = TRUE))
+
+full_year_country %>% 
+  left_join(first_years, by = c("country" = "birth_country")) %>% 
+  filter(year >= first_year)
+```
+
+
+
+

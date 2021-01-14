@@ -160,3 +160,67 @@ p1 +
             aes(x = 49.5, y = 0.5 * (2 * ymax - 20), label = group),
             color = '#dddddd', hjust = 1, size = 3) + 
   ggsave('transit_costs.png', height = 7, width = 11)
+
+
+
+# Redux (playing with scales) -----
+subtitle_text <- paste("China is the world leader in subway and railway projects. Of 537 transit constructions recorded by the",
+                      "Transit Costs Project, 253 (47%) were in China. This graphic shows the number of projects recorded for", 
+                      "each country, broken down by stage of completion.", 
+                       sep = '\n')
+p1 <- t_sum %>% 
+  ggplot() + 
+  geom_col(aes(x = country, y = value, 
+               group = country, fill = name), 
+           color = '#dddddd', size = .25) + 
+  geom_text(data = t_sum_text, aes(x = country, y = y, label = country_name),
+            color = '#999999', angle = 90, hjust = 0, nudge_y = 3) +
+  geom_segment(data = continent_lines,
+               aes(x = x, xend = xend, y = y, yend = y), color = '#666666') +
+  geom_segment(
+    data = pivot_longer(continent_lines, cols = c(x, xend)),
+    aes(x = value, xend = value, y = y, yend = y + 5),
+    color = '#666666'
+  ) +
+  geom_text(data = continent_lines,
+            aes(x = (x + xend) / 2, y = y-5, label = continent),
+            color = '#999999', angle = c(90, rep(0, 3), 90),
+            hjust = c(1, rep(0.5, 3), 1)) +
+  labs(
+    title = "Transit Projects Across the Globe",
+    subtitle = subtitle_text,
+    caption = "Source: Transit Cost Project    |    Visualization: @charliegallaghr"
+  ) + 
+  guides(fill = FALSE) +
+  scale_y_continuous(name = "Projects", expand = c(0.15, 0), breaks = seq(0,200, 50)) +
+  scale_fill_manual(values = grey(c(1, 0.4, 0))) +
+  theme_minimal() +
+  theme(
+    text = element_text(color = 'white', family = 'Roboto Lt', size = 10),
+    plot.background = element_rect(color = NA, fill = 'black'),
+    plot.title = element_text(family = 'Times New Roman', size = 30),
+    plot.subtitle = element_text(family = "Roboto Lt", size = 14),
+    plot.caption = element_text(family = "Roboto Lt", size = 12, color = "#dddddd"),
+    plot.margin = margin(15, 20, 5, 20),
+    panel.grid = element_blank(),
+    # panel.border = element_rect(color = 'white', fill = NA),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(family = 'Roboto Lt', size = 10, color = 'white')
+  )
+
+# Add a legend
+legend_df <- data.frame(
+  x = 50,
+  ymax = c(220, 200, 180),
+  group = c('Completed', 'In process', 'Planned')
+)
+
+p1 + 
+  geom_rect(data = legend_df, 
+            aes(xmin = x, xmax = x + 1, ymin = ymax - 20, ymax = ymax),
+            fill = grey(c(0, 0.4, 1)), color = '#dddddd', size = 0.25) + 
+  geom_text(data = legend_df,
+            aes(x = 49.5, y = 0.5 * (2 * ymax - 20), label = group),
+            color = '#dddddd', hjust = 1, size = 4) + 
+  ggsave('transit_costs_redux.png', height = 7, width = 11, scale = 1.7)
