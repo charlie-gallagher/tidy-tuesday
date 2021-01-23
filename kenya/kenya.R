@@ -76,7 +76,7 @@ p1 <- roof_material %>%
   geom_polygon() + 
   labs(
     title = "Ironsheet Roofs in Kenya",
-    subtitle = "Each house represents the share of households in that\ncounty that have a steelsheet rooftop.",
+    subtitle = "Each house represents the share of households in that\ncounty that have an ironsheet rooftop.",
     caption = "Source: {rKenyaCensus}    |    Visualization: @charliegallaghr"
   ) + 
   scale_fill_manual(name = "Legend:", values = c(roof_colors[["house_bg"]], roof_colors[["house_pct"]]),
@@ -107,4 +107,4 @@ p1 <- roof_material %>%
 p2 <- ggdraw(p1) + 
   draw_image(image = "kenya_flag_icon.png", height = 0.07, x = 0.21, y = 0.05)
 
-ggsave('test.png', p2, width = 10, height = 8, scale = 1.5)
+ggsave('kenya.png', p2, width = 10, height = 8, scale = 1.5)
