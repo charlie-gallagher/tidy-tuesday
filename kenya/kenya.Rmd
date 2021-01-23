@@ -1,0 +1,293 @@
+---
+title: "Kenya"
+output: html_notebook
+---
+
+```{r, message=FALSE}
+library(tidyverse)
+
+gender <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-01-19/gender.csv')
+crops <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-01-19/crops.csv')
+households <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-01-19/households.csv')
+
+```
+
+This week's data comes from the Kenya census data available in `rKenyaCensus`, which is available on GitHub. Each observation is a county in Kenya. Not so much data to work with, but I've seen some fairly good (and some atrocious) entries for this week. Not sure what I'm able to add to it. 
+
+Let me try to build a house-looking thing. 
+
+```{r}
+rect <- data.frame(
+  x = c(0.15, 0.15, 0.85, 0.85),
+  y = c(0, 1, 1, 0)
+)
+
+triangle <- data.frame(
+  x = c(0, 0.5, 1),
+  y = c(1, 1.5, 1)
+)
+
+sub_shapes <- data.frame(
+  shp = c(1, 1, 1, 1, 2, 2, 2),
+  x = c(0.15, 0.15, 0.25, 0.25, 0, 0.25, 0.25),
+  y = c(0, 1, 1, 0, 1, 1.25, 1)
+)
+
+ggplot(rect) + 
+  geom_polygon(aes(x = x, y = y)) + 
+  geom_polygon(data = triangle, aes(x = x, y = y)) +
+  geom_polygon(data = sub_shapes, aes(x = x, y = y, group = shp),
+               fill = 'red') + 
+  coord_fixed(ratio = 0.75)
+```
+
+Can I generate this given only the x value? I should be able to, yes. The value of `x` is between 0 and 1 depending on the fraction of people with a certain characteristic. The rectangle is trivial to construct, while the roof is a little more tricky, but since I have control over the aspect ratio, I can set values conveniently. For example, with a slope of 1 and a value of `x <= 0.5`, the height of the roof is `x + 1`. If `x > 0.5`, the height of the roof is `2 - x`. Then I just have to add an extra vertex at `(0.5, 1.5)`.
+
+```{r}
+pct <- 0.75
+
+house <- data.frame(
+  group = c(1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4),
+  x = c(0, 0, 1, 1, 0, 0.5, 1, 0, 0, pct, pct, 0, 0.5, pct, pct),
+  y = c(0, 1, 1, 0, 1, 1.5, 1, 0, 1, 1, 0, 1, 1.5, pct + 0.5, 1),
+  fill = c(0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1)
+)
+
+ggplot(data = house, aes(x = x, y = y, group = group)) + 
+  geom_polygon(aes(fill = factor(fill)))
+```
+
+Good looks... It still needs to be generalized. In a polygon, the order of the points matters, so it would be convenient to have ordering via `arrange()`. Generation will happen in two groups: less than or equal to half, more than half. Let's make a dataset of some fractions. 
+
+```{r}
+pop <- data.frame(
+  g = c('a', 'b', 'c'),
+  pct = c(0.1, 0.5, 0.67)
+)
+
+```
+
+Every group less than or equal to 0.5 is going to have the following template: 
+
+```{r}
+pct <- 0.5
+lthalf_template <- data.frame(
+  group = c(1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4),
+  x = c(0.1, 0.1, 0.9, 0.9, 0, 0.5, 1, 0.1, 0.1, pct, pct, 0, pct, pct),
+  y = c(0, 1, 1, 0, 1, 1.5, 1, 0, 1, 1, 0, 1, pct + 1, 1),
+  fill = c(0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1)
+)
+
+ggplot(lthalf_template, aes(x = x, y = y, group = group, fill = factor(fill))) + 
+  geom_polygon()
+```
+
+
+And all those above 0.5 get the other template. Let's make this a little prettier. That's better. The house shape is typical, so I will create vectors for that for reuse. 
+
+```{r}
+house_bg <- data.frame(
+  x = c(0.1, 0.1, 0, 0.5, 1, 0.9, 0.9),
+  y = c(0, 1, 1, 1.5, 1, 1, 0)
+)
+
+ggplot(house_bg, aes(x = x, y = y)) + geom_polygon()
+```
+
+Does `mutate` let me add multiple rows per group? It seems not, but summarize does. 
+
+```{r}
+pop %>% 
+  group_by(g, pct) %>% 
+  summarize(x = house_bg$x, y = house_bg$y)
+```
+
+Okay, that should be all the technique I need. Let me turn this into a function that generates a house given the percentage as an input. 
+
+```{r}
+make_house <- function(pct) {
+  house_bg <- data.frame(
+    x = c(0.05, 0.05, 0, 0.5, 1, 0.95, 0.95),
+    y = c(0, 1, 1, 1.5, 1, 1, 0),
+    g = 'bg'
+  )
+  
+  if (pct < 0.05) {
+    house_pct <- data.frame(
+      x = c(0, pct, pct),
+      y = c(1, pct + 1, 1),
+      g = 'fg'
+    )
+  }
+  
+  else if (pct <= 0.5 & pct >= 0.05) {
+    house_pct <- data.frame(
+      x = c(0.05, 0.05, 0, pct, pct),
+      y = c(0, 1, 1, pct + 1, 0),
+      g = 'fg'
+    )
+  }
+  
+  else if (pct > 0.5 & pct <= 0.95) {
+    house_pct <- data.frame(
+      x = c(0.05, 0.05, 0, 0.5, pct, pct),
+      y = c(0, 1, 1, 1.5, 2 - pct, 0),
+      g = 'fg'
+    )
+  }
+  
+  else if (pct > 0.95) {
+    house_pct <- data.frame(
+      x = c(0.05, 0.05, 0, 0.5, pct, pct, 0.95, 0.95),
+      y = c(0, 1, 1, 1.5, 2 - pct, 1, 1, 0),
+      g = 'fg'
+    )
+  }
+  
+  else {
+    stop("Incompatible pct")
+  }
+  
+  return(rbind(house_bg, house_pct))
+}
+
+make_house(0.97) %>%  ggplot(aes(x = x, y = y, group = g, fill = g)) + 
+  geom_polygon()
+```
+
+Tested this across all values. Seems to work just fine. Now, we can plot the `pop` data.frame. 
+
+```{r}
+pop %>% group_by(g, pct) %>% 
+  summarize(
+    x = make_house(pct)$x,
+    y = make_house(pct)$y,
+    bgfg = make_house(pct)$g
+  ) %>% 
+  ggplot() + 
+  geom_polygon(aes(x = x, y = y, group = interaction(g, bgfg), fill = bgfg)) + 
+  coord_fixed(ratio = 0.5) +
+  facet_wrap(vars(g))
+```
+
+Ah neat! This is exactly what I wanted. Now, the data problem. Right now, percentage is mapped to the x-axis, which is not reflective of percentage of the shape filled in. But I need to know what the error is so I can say whether it is acceptable or not. It depends on the aspect ratio. At half way, the error is zero, and at the wings the error is the highest. At a 1:1 ratio, pct = 0.04, the area is 0.7% of the total area. When pct = 0.25, the area is 20.1% of the total area. The approximation isn't very good, then, but the visual interpretation is clear, because people understand dividing the house into 100 parts vertically. 
+
+# Applying House Model to Data
+There are three datasets to choose from, and the typical questions might be: Share of population who farm, share of population who grow _x_. Share of population male. Share of population who lives in a house with more than one person (or something). The best one is the share of farmers. 
+
+```{r}
+total_pop <- gender %>% mutate(County = tolower(County)) %>% 
+  select(SubCounty = County, population = Total)
+
+crop_house <- crops %>% mutate(SubCounty = tolower(SubCounty)) %>% 
+  left_join(total_pop) %>% 
+  mutate(pct_farm = Farming / population) %>% 
+  select(county = SubCounty, pct_farm) %>% 
+  filter(!is.na(pct_farm)) %>% 
+  group_by(county, pct_farm) %>% 
+  summarize(
+    x = make_house(pct_farm)$x,
+    y = make_house(pct_farm)$y,
+    bgfg = make_house(pct_farm)$g
+  )
+
+ggplot(crop_house, aes(x = x, y = y, group = interaction(bgfg, county), 
+                       fill = bgfg)) + 
+  geom_polygon() + 
+  facet_wrap(vars(county)) + 
+  scale_fill_manual(values = c('#dddddddd', '#ffd500')) + 
+  theme_minimal()
+```
+
+
+Yeah, visually not very interesting, nor accurate as there are many small values. This makes the most sense when the range goes from zero to one. This might be the case with certain crops. 
+
+```{r}
+crops %>% 
+  mutate(pct_mango = Mango / Farming) %>% select(pct_mango, SubCounty) %>% 
+  filter(!is.na(pct_mango)) %>% 
+  group_by(SubCounty) %>% 
+  summarize(
+    x = make_house(pct_mango)$x,
+    y = make_house(pct_mango)$y,
+    bgfg = make_house(pct_mango)$g
+  ) %>% 
+  ggplot(aes(x, y, group = interaction(SubCounty, bgfg), fill = bgfg)) + 
+  geom_polygon() + 
+  facet_wrap(vars(SubCounty)) +
+  scale_fill_manual(values = c('#ddddddaa', '#edc600')) + 
+  theme_minimal()
+```
+
+
+# New Datasets
+To make good use of the house, I need 'percentage of households' to be the variable of interest. I got three more datasets covering the materials from which homes are made in each county and sub-county. I'm sure there is something in there that has the right distribution. It's a dangerous tack, though, as you don't want to simply invigorate people's preconceived notions of Kenya. Still, data is data... We'll see, as I sift through the datasets. 
+
+```{r}
+roof_material <- read_csv('v4212.csv')
+```
+
+This raises an interesting question: what's a conventional house? How many households live in conventional houses in each county? Let me merge and see if the numbers align. 
+
+```{r}
+roof_material %>% 
+  filter(AdminArea == "County") %>% 
+  mutate(County = tolower(County)) %>% 
+  left_join(mutate(households, County = tolower(County))) %>% 
+  mutate(pct_conventional = ConventionalHouseholds / NumberOfHouseholds) %>% 
+  select(County, pct_conventional)
+```
+
+Almost all in almost all counties, but two are quite low (Lamu, 90%, Isiolo, 91%). It might be interesting to highlight this. 
+
+```{r}
+conventional_houses <- roof_material %>% 
+  filter(AdminArea == "County") %>% 
+  mutate(County = tolower(County)) %>% 
+  left_join(mutate(households, County = tolower(County))) %>% 
+  mutate(pct_conventional = ConventionalHouseholds / NumberOfHouseholds) %>% 
+  select(County, pct_conventional)
+
+conventional_houses %>% group_by(County) %>% 
+  filter(!is.na(pct_conventional)) %>% 
+  summarize(
+    x = make_house(pct_conventional)$x,
+    y = make_house(pct_conventional)$y,
+    bgfg = make_house(pct_conventional)$g
+  ) %>% 
+  ggplot(aes(x, y, group = interaction(County, bgfg), fill = bgfg)) + 
+  geom_polygon() + 
+  facet_wrap(vars(County))
+```
+
+I'm sure this isn't what the data is meant for, though, and I don't know the meaning of 'conventional housing' anyway. Will come back to this. 
+
+Let's look at roof material by county. 
+
+```{r}
+roof_material <- roof_material %>% filter(AdminArea == "County") %>% 
+  janitor::clean_names()
+  
+
+roof_material %>% pivot_longer(cols = grass_twigs:not_stated) %>% 
+  ggplot() + 
+  geom_col(aes(x = county, y = value, group = name, fill = name)) + 
+  scale_fill_viridis_d()
+```
+
+For the households graphic, houses with roofs of grass/twigs might make for a good spread. As would houses with roofs of iron sheets. Let me make both of these and see what they look like. 
+
+```{r}
+roof_material %>% 
+  group_by(county, ironsheets) %>% 
+  summarize(
+    x = make_house(ironsheets/100)$x,
+    y = make_house(ironsheets/100)$y,
+    g = make_house(ironsheets/100)$g
+  ) %>% 
+  ggplot(aes(x, y, group = interaction(county, g), fill = g)) + 
+  geom_polygon() + 
+  facet_wrap(vars(county))
+```
+
+I think I'm going to go with iron sheets. It has nice variation. 

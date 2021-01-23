@@ -88,13 +88,23 @@ full_decade_country <- full_decade_country %>% mutate(present = TRUE) %>%
 # Plotting -------
 
 
+# col <- c(
+#   "bg" = "#1d2424",
+#   "text" = "#dcdcdd",
+#   "new" = "#d0c3bd",
+#   "again" = "#437571",
+#   "old" = "#324242"
+# )
+
 col <- c(
-  "bg" = "#1d2424",
-  "text" = "#dcdcdd",
-  "new" = "#d0c3bd",
-  "again" = "#437571",
-  "old" = "#324242"
+  "bg" = "#454545ff",
+  "text" = "#c2c5c5ff",
+  "new" = "#ffde17ff",
+  "again" = "#a7abacff",
+  "old" = "#575b5dff"
 )
+
+
 
 
 # Plot the data
@@ -164,4 +174,4 @@ art_text_plot <- art_text %>%
 
 # Combine
 plot_grid(art_text_plot, data_plot, nrow = 2, rel_heights = c(1, 4)) + 
-  ggsave('art_collection.png', height = 16, width = 13)
+  ggsave('art_collection_color2.png', height = 16, width = 13)
