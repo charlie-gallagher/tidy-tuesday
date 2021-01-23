@@ -3,6 +3,9 @@
 
 # Gallery
 ## 2021
+### Week 3
+![Kenyan house materials](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/kenya/kenya.png)
+
 ### Week 2
 ![Tate Art Collection](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/art_collections/art_collection.png)
 
