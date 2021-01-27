@@ -3,6 +3,9 @@
 
 # Gallery
 ## 2021
+### Week 4
+![Plastic](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/plastic_pollution/plastic_pollution.png)
+
 ### Week 3
 ![Kenyan house materials](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/kenya/kenya.png)
 
