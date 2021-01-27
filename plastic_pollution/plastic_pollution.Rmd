@@ -1,0 +1,253 @@
+---
+title: "Plastic Pollution"
+output: html_notebook
+---
+
+This week's data comes from "Break Free from Plastic" and Sarah Sauve. 
+
+```{r load, message=FALSE}
+library(tidyverse)
+plastics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-01-26/plastics.csv')
+```
+
+
+Get the skim: 
+```{r skim}
+skimr::skim(plastics)
+```
+
+13,380 observations, the unit of observation is the year, parent company, and country. Years are 2019 and 2020. There are 10,823 unique companies in 69 countries. The variables include basic identifying information and data on the types of plastic (high-density polyethylene, low-density polyethylene, etc.). The grand total variable gives total count of all plastic items. It seems the unit for the numeric columns is number of plastic items counted during counting events. There is a variable for number and attendance of counting events. Raw numbers have to be put in context, then, probably rationally. 
+
+The plastics: 
+
+- Empty   (category left empty by volunteer)
+- HDPE    (high-density polyethylene)
+- LDPE    (low-density polyethylene)
+- O       (other)
+- PET     (Polyester)
+- PP      (Polypropylene)
+- PS      (Polystyrene)
+- PVC     (PVC plastic)
+
+See the data dictionary for examples of each type of plastic. Now, I've been doing tiny multiples a lot recently, so I want to get away from that. I would like a graphic either with a single focal point or several focal points. Maybe this is the week I try a graphic in the style of the South China Morning Post. First, let's see if we can find a focal point. 
+
+Further data note: each country has a grand total 'company' which is not a company, but the country's total. Nasty... 
+
+```{r}
+plastics %>% 
+  janitor::tabyl(parent_company) %>% 
+  arrange(desc(n)) %>% 
+  head(n = 25)
+```
+
+Yeah... a decent amount of work needs to go into this to standardize things. Names of countries and names of companies need to be checked for duplicates. I wonder how you can measure the similarity of words... I remember someone saying you can test similarity with some cosine technique. Since letters have numeric values once decoded, it's probably possible to use cosine similarity on a vector of letters. Anyway, that's a job for another day. 
+
+Okay, let's filter out 'grand total' companies. 
+
+```{r}
+plastics <- plastics %>% 
+  filter(parent_company != "Grand Total")
+```
+
+
+# Brief Exploration of Data
+First, grand-totals by country. 
+
+```{r raw plastics by country}
+plastics %>% 
+  mutate(year = factor(year)) %>% 
+  group_by(country, year) %>% 
+  summarize(national_total = sum(sum(grand_total, na.rm = TRUE))) %>% 
+  ggplot() + 
+  geom_col(aes(x = reorder(country, desc(national_total)), y = national_total),
+           fill = 'pink') + 
+  geom_point(aes(x = country, y = national_total)) + 
+  geom_text(aes(x = country, y = national_total, label = country),
+            nudge_x = 1, hjust = 0) +
+  facet_wrap(vars(year))
+```
+
+China leads by a substantial amount. Other contenders are Nigeria (check for name duplicates), Philippines, and Switzerland. This isn't the most descriptive, since it depends on the number of volunteers and events. I suppose I could make it relative by looking at plastic per volunteer, although this assumes something about the uniformity of volunteers in different countries. Let's see anyway. 
+
+```{r}
+plastics %>% 
+  mutate(year = factor(year),
+         adj_grand_total = grand_total / volunteers) %>% 
+  group_by(country, year) %>% 
+  summarize(adj_national_total = sum(sum(adj_grand_total, na.rm = TRUE))) %>% 
+  ggplot() + 
+  geom_col(aes(x = reorder(country, desc(adj_national_total)), y = adj_national_total),
+           fill = 'pink') + 
+  geom_point(aes(x = country, y = adj_national_total)) + 
+  geom_text(aes(x = country, y = adj_national_total, label = country),
+            nudge_x = 1, hjust = 0) +
+  facet_wrap(vars(year), scales = 'free') + 
+  theme(axis.text.x = element_text(angle = 90, size = 5, hjust = 1, vjust = 0.5))
+```
+
+So this is a graph of the number of plastics collected in each country per volunteer. I guess this makes two assumptions: (1) volunteers are uniform in ability to collect plastic, (2) the amount of plastic a volunteer picks up is directly related to the amount of plastic in the country. All of this is invalid, though. Less invalid is the relative proportions of the different types of plastic collected in each country. 
+
+```{r}
+plastics %>% 
+  pivot_longer(cols = empty:pvc) %>% 
+  group_by(country, name) %>% 
+  summarize(type_total = sum(value, na.rm = TRUE),
+            grand_total = sum(grand_total)) %>% 
+  mutate(pct_grand_total = type_total / grand_total) %>% 
+  ggplot() + 
+  geom_col(aes(x = country, y = pct_grand_total, group = name, fill = name),
+           position = position_stack()) + 
+  scale_y_continuous(expand = c(0,0)) + 
+  scale_fill_brewer(type = 'div') + 
+  theme(axis.text.x = element_text(size = 5, angle = 90, hjust = 1))
+```
+
+I would prefer if the 'other' and 'empty' categories were at the end, because they are a little overwhelming. That's a finishing though, though. 
+
+### Graphic Ideas
+I can rule out three visualizations that have major flaws or unreasonable assumptions: 
+
+- number of pieces of trash (depends on number and character of volunteers)
+- number of pieces of trash per volunteer (assumes uniformity of volunteers and locations)
+- change in number of pieces of trash (efforts not sustained between years)
+
+As for years, I should either aggregate and consider it a single time period, or use only one year. 
+
+This leaves graphics based on what is 'most common': 
+
+- Most common type of trash (by country, company, etc.)
+- Most common company (by country, plastic type, etc.)
+
+And graphics based on relative amounts of trash
+
+- share of trash in each country of each type
+- Share of trash in each country from major sources
+
+This is a minefield, though. Each company itself produces a different amount of potential trash, so the amount trash found depends on the company's size and production in that country. Coca-Cola is probably found most often because they produce _so many_ bottles every year, and they're popular everywhere. I guess what I'm wondering is, what is this dataset going to say? Is it about the companies? Is there anything Coca-Cola can do to reduce its plastic waste? Should it be held accountable? These questions are naturally outside the Tidy Tuesday scope, but I don't want to say something like "These companies are terrible!" when the fact is, this is more a comment on polluters (e.g. people who throw their trash in the ocean) than the companies supplying their products. 
+
+So where do I go from here? I think most common type of plastic found. This fortunately ignores the whole company name fiasco. 
+
+Do I break it down by country or make it global? Continental? Developing and developed? 
+
+I could also focus on the volunteer-side. How many countries saw volunteers and how many were there? How much trash did they pick up? I think circles would look nice here, like trash balls with vertical callouts describing the number of volunteers and the number of pieces of trash. Only top 5 countries considered. 
+
+```{r}
+vol <- plastics %>% 
+  filter(parent_company == "Grand Total" & country != 'EMPTY') %>% 
+  select(country, year, num_events, volunteers, grand_total) %>% 
+  group_by(country) %>% 
+  summarize(
+    season = '2019-2020',
+    events = sum(num_events, na.rm = TRUE),
+    volunteers = sum(volunteers, na.rm = TRUE),
+    grand_total = sum(grand_total, na.rm = TRUE)
+  )
+
+vol %>% 
+  ggplot() + 
+  geom_col(aes(x = reorder(country, desc(grand_total)), y = grand_total)) + 
+  geom_text(aes(x = country, y = grand_total, label = country),
+            hjust = 0, angle = 45)
+```
+
+I'm choosing the top four as well as the US, to highlight its poor performance. Now, using the `stringdist` package, I can find close matches of countries to make sure I'm getting them all. But I may not need to, if there are only 51. Everything looks clean. 
+
+```{r}
+vol_countries <- c(
+  'United States of America',
+  'Indonesia',
+  'Philippines',
+  'NIGERIA',
+  "Taiwan_ Republic of China (ROC)"
+)
+
+vol <- vol %>% 
+  filter(country %in% vol_countries) %>% 
+  mutate(
+    country = case_when(
+      country == "NIGERIA" ~ "Nigeria",
+      country == "Taiwan_ Republic of China (ROC)" ~ "Taiwan",
+      TRUE ~ country
+    ),
+    country = reorder(country, grand_total)
+  )
+
+ggplot(vol) + 
+  geom_col(aes(x = country, y = grand_total))
+```
+
+
+Now, I need to generate the circular fields of trash, which for now are just points. How will I do this? Hm. An answer from stack gives this: 
+
+```
+r = R * sqrt(random())
+theta = random() * 2 * PI
+
+x = centerX + r * cos(theta)
+y = centerY + r * sin(theta)
+```
+
+which isn't in R, but is obviously convertible. 
+
+```{r}
+R <- 1
+r <- R * sqrt(runif(1))
+theta <- runif(1) * 2 * pi
+
+x <- r * cos(theta)
+y <- r * sin(theta)
+```
+
+Let's see if this generalizes. 
+
+```{r}
+R <- 1
+r <- R * sqrt(runif(1000))
+theta <- runif(1000) * 2 * pi
+
+data.frame(
+  x = r * cos(theta),
+  y = r * sin(theta)
+) %>% 
+  ggplot() + 
+  geom_point(aes(x = x, y = y), size = 2) + 
+  coord_fixed()
+```
+
+Oh this fills in nicely. It's not quite as uniform as I would like (I think I need a less-than-random pattern). I would like it if points were 'allergic' to each other. This would require some knowledge of how large the points were, though. Also, I need to map the size of the circle to some variable. The density should remain constant while the size of the circle increases. That's the hard part. I might have an idea. 
+
+```{r}
+grand_total <- 100
+R <- sqrt(grand_total / pi)
+r <- R * sqrt(runif(grand_total))
+theta <- runif(grand_total) * 2 * pi
+
+df1 <- data.frame(
+  x = r * cos(theta),
+  y = r * sin(theta)
+) 
+
+
+
+grand_total <- 1000
+R <- sqrt(grand_total / pi)
+r <- R * sqrt(runif(grand_total))
+theta <- runif(grand_total) * 2 * pi
+
+df2 <- data.frame(
+  x = 25 + r * cos(theta),
+  y = r*sin(theta)
+)
+
+
+
+
+df <- rbind(df1, df2)
+
+df %>% 
+  ggplot() + 
+  geom_point(aes(x = x, y = y)) + 
+  coord_fixed()
+```
+
+Voila! Perfect. Let's turn it into a function and plot the data. Moving everything to the R file now. 
