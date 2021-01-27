@@ -100,6 +100,17 @@ vol_label <- x0 %>%
   )
 
 
+# Title and legend
+subtitle_text <- "The Break Free from Plastic Movement is a global movement\nwhose goal is to put positive pressure on corporations to reduce\ntheir waste. Their annual Brand Audits sort trash and identify\nthe brand and type of plastic, among other things. This graphic\nexplores five different contributors to the project, how many\nvolunteers they've had in the past two years, and how much trash \nthey've audited."
+title_and_legend <- data.frame(
+  label = c("BREAK FREE FROM PLASTIC", subtitle_text, "= 100 pieces of trash"),
+  y = c(375, 325, 300),
+  x = c(-100, -100, 1070),
+  size = c(9, 4, 3),
+  hjust = c(0, 0, 0),
+  vjust = c(1, 1, 0.5),
+  family = c('Roboto', 'Roboto Lt', 'Roboto Lt')
+)
 
 
 
@@ -116,20 +127,33 @@ p1 <- ggplot(vol_cluster) +
     aes(x = x0, y = -280, label = country),
     vjust = 1, fontface = 'bold', family = "Roboto", lineheight = 0.9
   ) + 
+  # Title, subtitle, legend text
+  geom_text(
+    data = title_and_legend, 
+    aes(x = x, y = y, label = label),
+    size = title_and_legend$size,
+    hjust = title_and_legend$hjust,
+    vjust = title_and_legend$vjust,
+    family = title_and_legend$family,
+    lineheight = 0.9
+  ) +
+  geom_point(data = NULL, aes(x = 1060, y = 299)) +
   labs(
-    title = "BREAK FREE FROM PLASTIC",
-    subtitle = "The Break Free from Plastic Movement is a global movement\nwhose goal is to put positive pressure on corporations to reduce\ntheir waste. Their annual Brand Audits sort trash and identify\nthe brand and type of plastic, among other things. This graphic\nexplores five different contributors to the project, how many\nvolunteers they've had in the past two years, and how much trash \nthey've audited.",
     caption = "Source: Break Free from Plastic    |    Visualization: @charliegallaghr"
   ) +
-  scale_y_continuous(expand = c(0.1, 0, 0.01, 0)) + 
+  scale_y_continuous(expand = c(0.1, 0, 0.05, 0)) + 
+  scale_x_continuous(expand = c(0,0)) +
   coord_fixed() + 
   theme_void(base_family = "Roboto Lt") + 
   theme(
-    plot.margin = margin(5, 20, 0, 30),
-    plot.title = element_text(family = "Roboto", size = 25),
+    plot.margin = margin(5, 20, 10, 30),
     plot.caption = element_text(size = 10)
   )
 
-ggsave('plastic_pollution.png', p1, width = 12, height = 6.2, scale = 1.1)
+ggsave('plastic_pollution.png', p1, width = 12, height = 6.5, scale = 1.1)
+
+svg('plastic_pollution.svg', width = 13, height = 7)
+p1
+dev.off()
 
 
