@@ -38,6 +38,23 @@ vol <- vol %>%
 
 
 # Generating circular clusters -------
+
+# See this stack answer: https://bit.ly/3cnC723
+# This generates uniform points in a circular area given the radius. 
+# I'm mapping trash pieces to area of the circle, but this circle is defined
+# by its radius, so solving for r given formula for area: r = sqrt(A / pi).
+# Second, I want the density of the points to stay constant. The density
+# is directly proportional to the area, which is pieces of trash. So, you 
+# can use a*N where a is some proportion and N is pieces of trash. I chose
+# a = 1/100 because it looks nice at this size. 
+
+# Original formulas from stack: 
+# r = R * sqrt(random())
+# theta = random() * 2 * PI
+# x = centerX + r * cos(theta)
+# y = centerY + r * sin(theta)
+
+
 # Circle generating function
 make_circle_cluster <- function(n, country) {
   R <- sqrt(n / pi)
