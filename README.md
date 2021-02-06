@@ -3,6 +3,9 @@
 
 # Gallery
 ## 2021
+### Week 5
+![Two year colleges gain against four-year colleges and universities](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/hbcu/hbcu.png)
+
 ### Week 4
 ![Plastic](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/plastic_pollution/plastic_pollution.png)
 
