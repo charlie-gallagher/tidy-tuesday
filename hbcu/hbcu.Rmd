@@ -1,0 +1,104 @@
+---
+title: "HBCU Enrollment"
+output: html_notebook
+---
+
+```{r, message=FALSE}
+library(tidyverse)
+hbcu <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-02/hbcu_all.csv') %>% 
+  janitor::clean_names()
+```
+
+This week's data is on Historically Black Colleges and Universities, their enrollment and attendance. This data actually only contains data on total enrollment for HBCUs for some year range. Let's see the skim. 
+
+```{r}
+skimr::skim(hbcu)
+```
+
+The data is very small, 32 observations of 12 variables. Every variable read in as numeric. There are no missing values. The range of years is from 1976 to 2015, with data every 4 years from 1976-1980, every 2 years from 1980-1990, and every year thereafter. 
+
+For once, the histograms are useful. You can see that there are fewer observations for the older years. Total enrollment, number of females, and total public enrollment are similarly and unusually distributed; I'll look into these. `x4_year` is left-skewed; `x2_year_private` is right skewed, both fairly evenly. `x2_year_public` is weighted on its tails, and number of males is almost normal in its distribution.
+
+The data is temporal, so here are all the variables over time. 
+
+```{r}
+hbcu %>% 
+  pivot_longer(cols = total_enrollment:x2_year_private) %>% 
+  ggplot() + 
+  geom_line(aes(year, value, group = name)) + 
+  facet_wrap(vars(name), scales = 'free')
+```
+
+Two-year private schools are the only type of enrollment that has seen a complete drop-off. Note here that the x-axes are all free, so they are not zeroed. Total enrollment is up, so it makes sense that the rest of the enrollments would follow suit. Looking at this relatively is easy: 
+
+```{r}
+hbcu %>% 
+  pivot_longer(cols = males:x2_year_private) %>% 
+  mutate(share = value / total_enrollment) %>% 
+  ggplot() + 
+  geom_line(aes(year, share, group = name)) + 
+  facet_wrap(vars(name), scales = 'free')
+```
+
+So females are on the rise, with a consequent fall in male enrollment. Public outweighs private, and this trend seems to be getting stronger. A fall in 4-year (thoroughly dominant, still) is complemented with a rise in 2-year. In the final four categories (types of two- and four-year), While 4-year public dominant, it has fallen a little since the 90s. I'd like to see relative area charts of these. 
+
+```{r}
+hbcu %>% 
+  pivot_longer(cols = males:x2_year_private) %>% 
+  mutate(
+    share = value / total_enrollment,
+    g = case_when(
+      name %in% c('males', 'females') ~ "male_female",
+      name %in% c('total_private', 'total_public') ~ "private_public",
+      name %in% c('x2_year', 'x4_year') ~ "n_years",
+      TRUE ~ "year_type"
+    )
+  ) %>% 
+  ggplot() + 
+  geom_area(aes(x = year, y = share, group = name, fill = name)) +
+  scale_fill_viridis_d() +
+  facet_wrap(vars(g))
+```
+
+More female than male (and gaining); more 4-year than 2-year (and falling); more public than private (slight fall); and mostly 4-year public, with a strong 4-year private, a slightly gaining 2-year public, and a non-existent 2-year private. 
+
+Many of these trends are consistent, which means it might be okay to do a slope chart. I like slope charts -- they look good and they simplify the shape of the trendline. They only make sense under certain circumstances, though, and I'm not sure if this data meets those. Let's make one anyway. 
+
+```{r}
+hbcu_long <- hbcu %>% 
+  pivot_longer(cols = males:x2_year_private) %>% 
+  mutate(
+    share = value / total_enrollment,
+    g = case_when(
+      name %in% c('males', 'females') ~ "male_female",
+      name %in% c('total_private', 'total_public') ~ "private_public",
+      name %in% c('x2_year', 'x4_year') ~ "n_years",
+      TRUE ~ "year_type"
+    )
+  )
+
+hbcu_long %>% 
+  filter(year %in% c(1976, 2015)) %>% 
+  ggplot() + 
+  geom_line(aes(x = year, y = share, group = name)) + 
+  facet_wrap(vars(g))
+```
+
+Not so good looking. Moving on then. Maybe a four-panel composition like I have above could work, but not by itself. It needs a focus. One of the 3-panel SMCP-style designs could work. 
+
+Possible features: 
+
+- Total enrollment over time
+- Relative enrollment of different types as 4-panel
+- Map showing the locations of HBCUs
+
+```{r}
+hbcu %>% 
+  ggplot() + 
+  geom_line(aes(x = year, y = total_enrollment)) + 
+  ylim(c(0, 327000))
+```
+
+This isn't a very good centerpiece, but neither are the panels. The map is an idea, I suppose, but it's a stretch. Not to mention it's going to take some time to get the data together. 
+
+Well, I'm scrapping the idea I had before. I just don't have the time or design skills to execute a larger graphic in so short a time. I need a way into this data, but I don't know what it is. I'm feeling impatient this week, which is a problem. There are a few other things I would rather be doing. Keep it simple, then. 
