@@ -76,9 +76,9 @@ t <- tibble(
 
 # Auxiliary elements -----
 hbcu_subtitle <- paste(
-  "Historically black colleges and universities (HBCUs) have experienced",
-  "a rise in the attendance of two-year colleges. This is according to data",
-  "gathered by the National Center for Education Statistics (NCES).",
+  "Among Historically Black Colleges and Universities (HBCUs), two-year",
+  "colleges have seen a rise in popularity. Since 1976, the market share",
+  "of two-year colleges has risen by 75% against four-year colleges.",
   sep = '\n'
 )
 
