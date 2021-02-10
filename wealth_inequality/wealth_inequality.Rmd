@@ -1,0 +1,302 @@
+---
+title: "Wealth Inequality"
+output: html_notebook
+---
+
+```{r, message=FALSE}
+library(tidyverse)
+lifetime_earn <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/lifetime_earn.csv')
+student_debt <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/student_debt.csv')
+retirement <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/retirement.csv')
+home_owner <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/home_owner.csv')
+race_wealth <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/race_wealth.csv')
+income_time <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/income_time.csv')
+income_limits <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/income_limits.csv')
+income_aggregate <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/income_aggregate.csv')
+income_distribution <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/income_distribution.csv')
+income_mean <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/income_mean.csv')
+```
+
+Lots of datasets this week, all related to wealth inequality. The source is both the Urban Institute and the US Census.
+
+- `home_owner` Homeownership percentage for families by year and race
+- `income_aggregate` Share of aggregate income receieved by each 5th and top 5% of each racial/household group. 
+- `income_distribution` Households by total money income, race, and hispanic origin of householder by year and income groups.
+- `income_limits` Familial income limits for each fifth by year and race. 
+- `income_mean` Mean income received by each 5th and top 5% of each racial group. 
+- `income_time` Family-level income by percentile and year
+- `lifetime_earn` Average lifetime earning by race/gender.
+- `race_wealth` Family wealth by year, race, and either mean or median, normalized to 2016. 
+- `retirement` Average family liquid retirement savings normalized to 2016 dollars. - `student_debt` Average family student debt for ages 25-55 by race and year, normalized to 2016 dollars. 
+
+Each dataset is small. The largest is `income_mean` with 3,708 observations. The names in each dataset are: 
+
+```{r}
+all <- list(home_owner, income_aggregate, income_distribution, income_limits,
+     income_mean, income_time, lifetime_earn, race_wealth, retirement, 
+     student_debt)
+names(all) <- ls()[-1]
+lapply(all, names)
+```
+
+Every dataset has a `year` variable, and most have a `race` variable. The sole exception is `income_time`. What are the ranges of years for each dataset? 
+
+```{r}
+lapply(all, function(x) range(x$year))
+```
+
+I forgot that `lifetime_earn` doesn't have a year variable. That's okay, we got through. The date ranges are a little all over the place, and no doubt they aren't date objects yet. The smallest range is for `retirement` and `student loans` (1989-2016), while the largest range is for `income_time` (1963-2016). Four out of five `income_*` datasets cover 1967-2019. `income_time` is the exception. 
+
+It's not very practical to skim nine datasets, so I'll abstain from that. I have to restrict my data somehow. As an economics major, I should have a foothold here, and it's true I already know a lot about student loan debt (enough to know that quantity of loan debt alone is not a good proxy for financial burden). 
+
+
+# Ideas
+I don't have any at the moment. I know I want to avoid filling in blocks of space, because this doesn't generally look good. Also, avoid circles because I've been seeing a lot of them lately. Gosh... maybe I'm running out of ideas for graphics. 
+
+Eh, nothing riding on this anyway. I could do another black and white graphic, or a graphic that emphasizes design (simple/traditional graph, nice visuals). Some things I routinely avoid that I don't have to avoid: animations, maps, variations on traditional graphs (think daggers, dumbbells, distorted lines), graphics in two or more parts...
+
+Take something whose scale is hard to comprehend and show it in a way that makes it easier to comprehend (think population density via dots in circles, spacing between planets). For example, just how much more wealth is held by white families, or by the average white family, than the other races? Something like that. 
+
+This is always easier with a data feature to exploit. Let's look at `race_wealth`, which is family wealth by year. 
+
+```{r}
+race_wealth
+```
+
+Two `type` values, mean and median. I'll use mean first. 
+
+```{r}
+race_wealth %>% 
+  filter(type == "Average") %>% 
+  ggplot() + 
+  geom_line(aes(x = year, y = wealth_family, group = race, linetype = race, color = race))
+```
+
+From The beginning to 1985, there were only two groups (White, Non-White). Then, they split White and Non-White into Black and Hispanic. Let's see median.
+
+```{r}
+race_wealth %>% 
+  filter(type == "Median") %>% 
+  ggplot() + 
+  geom_line(aes(x = year, y = wealth_family, group = race, linetype = race, color = race))
+```
+
+A shameful disparity by the looks of it. What determines family wealth? Bequethals probably account for a fair share, and I would guess birth rates are lower among white families. Fewer ways to split the wealth, more concentration per family. But that assumes there is some wealth to begin with, and it seems like there wasn't. 
+
+I criticized the type of offset chart seen in Georgios Karamanis's graphic on Washington trails for being hard to read. It could be effective here, even if it does use blocks of color... Let me see if I have what I need to make one. I need (a) proportion of families in US who are white and (b) percentage of wealth held by those families. Looks like I'll find something close to that in `income_distribution`, which has number of households by race as well as median and mean income and income distribution (share of households within each income bracket). Can I derive anything from this? Number of households times mean income gives you total income for that group. That's all I need for a mock. 
+
+```{r}
+income_distribution %>% 
+  filter(race != "All Races") %>% 
+  group_by(race, year, number, income_mean) %>% 
+  summarize() %>% 
+  ungroup() %>% 
+  mutate(total_income = number * income_mean) %>% 
+  ggplot() + 
+  geom_col(aes(x = year, y = total_income, group = race, fill = race))
+```
+
+Weird that there are stats for both "White Alone" and "White Along, Not Hispanic." Anyway, now let's look at the population distribution. 
+
+```{r}
+income_distribution %>% 
+  filter(race != "All Races") %>% 
+  group_by(race, year, number, income_mean) %>% 
+  summarize() %>% 
+  ungroup() %>% 
+  mutate(total_income = number * income_mean) %>% 
+  ggplot() + 
+  geom_col(aes(x = year, y = number, group = race, fill = race))
+```
+
+
+So, I need to choose one of "X alone or in combination" or "X alone" for each group, because they seem to overlap. I can check this with the 'All races' group. Let's limit it to one year, 2019.
+
+```{r}
+income_distribution %>% 
+  filter(year == 2019) %>% 
+  group_by(race, year, number, income_mean) %>% 
+  summarize() %>% 
+  ungroup() %>% 
+  mutate(total_income = number * income_mean) %>% 
+  ggplot() + 
+  geom_col(aes(x = year, y = total_income, group = race, fill = race))
+```
+
+"All Race" is smaller than the rest of the group, so I will drop the ones I think are overlaps. To plot both columns on the same I will need a new x-axis. Ultimately, the graph is made of stacked area lines, but I will start here. 
+
+```{r}
+id <- income_distribution %>% 
+  filter(year == 2016, 
+         !(race %in% c('Asian Alone', 'Black Alone', 'White Alone')),
+         race != "All Races"
+         ) %>% 
+  group_by(race, number, income_mean) %>% 
+  summarize() %>% 
+  ungroup() %>% 
+  mutate(
+    total_income = number * income_mean,
+    share_pop = number / sum(number),
+    share_inc = total_income / sum(total_income)
+  )
+
+id %>% 
+  pivot_longer(cols = c(share_pop, share_inc)) %>% 
+  mutate(name = factor(name, levels = c("share_pop", "share_inc"))) %>% 
+  ggplot() + 
+  geom_col(aes(x = name, y = value, group = race, fill = race))
+
+
+```
+
+Not the divide I was expecting. Really makes the wealth gap feel less excusable. Okay, using this data I can also derive the distribution of wealth in 2019 (or close to there). In the `income_distribution` dataset I have number of households, so I need average wealth per household by year and race. That's in the `race_wealth` dataset, it looks like. 
+
+```{r}
+race_wealth %>% 
+  filter(type == "Average" & year == 2016) %>% select(-type)
+```
+
+The data uses a different race variable and isn't as descriptive as the other dataset. Rough. Okay, not a problem, I just have to align the race variables and merge in the number of households.  
+
+```{r}
+wealth <- id %>% 
+  mutate(
+    race = case_when(
+      grepl("White", race) ~ "White",
+      grepl("Black", race) ~ "Black",
+      grepl("Hispanic", race) ~ "Hispanic"
+    )
+  ) %>% 
+  select(race, number, total_income)
+
+df <- race_wealth %>% 
+  filter(type == "Average" & year == 2016 & race != "Non-White") %>% 
+  select(-type) %>% 
+  left_join(wealth, by = 'race') %>% 
+  mutate(
+    share_pop = number / sum(number),
+    share_inc = total_income / sum(total_income),
+    total_wealth = wealth_family * number,
+    share_wealth = total_wealth / sum(total_wealth)
+  ) %>% 
+  select(year, race, share_pop, share_inc, share_wealth) %>% 
+  pivot_longer(cols = share_pop:share_wealth)
+
+df %>% 
+  ggplot() + 
+  geom_col(aes(x = name, y = value, group = race, fill = race))
+
+```
+
+Looks good... Okay enough for tonight. Tomorrow, I'll design the thing. 
+
+
+
+# Design
+
+From the beginning: 
+
+```{r}
+library(tidyverse)
+
+race_wealth <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/race_wealth.csv')
+
+income_distribution <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/income_distribution.csv')
+
+id <- income_distribution %>% 
+  filter(year == 2016, 
+         !(race %in% c('Asian Alone', 'Black Alone', 'White Alone')),
+         race != "All Races"
+         ) %>% 
+  group_by(race, number, income_mean) %>% 
+  summarize() %>% 
+  ungroup() %>% 
+  mutate(
+    total_income = number * income_mean,
+    share_pop = number / sum(number),
+    share_inc = total_income / sum(total_income)
+  )
+
+wealth <- id %>% 
+  mutate(
+    race = case_when(
+      grepl("White", race) ~ "White",
+      grepl("Black", race) ~ "Black",
+      grepl("Hispanic", race) ~ "Hispanic"
+    )
+  ) %>% 
+  select(race, number, total_income)
+
+w <- race_wealth %>% 
+  filter(type == "Average" & year == 2016 & race != "Non-White") %>% 
+  select(-type) %>% 
+  left_join(wealth, by = 'race') %>% 
+  mutate(
+    share_pop = number / sum(number),
+    share_inc = total_income / sum(total_income),
+    total_wealth = wealth_family * number,
+    share_wealth = total_wealth / sum(total_wealth)
+  ) %>% 
+  select(year, race, share_pop, share_inc, share_wealth) %>% 
+  pivot_longer(cols = share_pop:share_wealth)
+
+w %>% 
+  ggplot() + 
+  geom_col(aes(x = name, y = value, group = race, fill = race))
+```
+
+How can I make this into the design I want? Stacked area is the easiest way, but I will have to add observations. 
+
+```{r}
+w
+```
+
+The first graph is a bar from `share_pop` to `share_inc`. 
+
+```{r}
+w %>% 
+  filter(name %in% c('share_pop', 'share_wealth')) %>% 
+  group_by_all() %>% 
+  summarize(
+    x = case_when(
+      name == "share_pop" ~ c(0,1),
+      name == "share_wealth" ~ c(7, 8)
+    )
+  ) %>% 
+  ungroup() %>% 
+  ggplot() + 
+  geom_area(aes(x = x, y = value, group = race, fill = race))
+```
+
+The effect is really only visible with wealth. I might just do this graph, then. Can I use black and white? 
+
+```{r}
+w1 <- w %>% 
+  filter(name %in% c('share_pop', 'share_wealth')) %>% 
+  group_by_all() %>% 
+  summarize(
+    x = case_when(
+      name == "share_pop" ~ c(0,1),
+      name == "share_wealth" ~ c(7, 8)
+    )
+  ) %>% 
+  ungroup()
+
+w1 %>% 
+  ggplot() + 
+  geom_area(aes(x = x, y = value, group = race, fill = race)) + 
+  scale_fill_manual(values = c(grey(0.66), grey(0), grey(0.33))) + 
+  scale_y_continuous(expand = c(0,0)) + 
+  scale_x_continuous(expand = c(0,0)) +
+  theme_minimal() + 
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
+```
+
+
+Sources of inspiration: [Duncan Greere](https://www.instagram.com/p/B268-UCiV3u/?igshid=1uevnray0xoe9) and [Georgios Karamanis](https://twitter.com/geokaramanis/status/1332369637128986624/photo/1). 
+
+I think it will work well Tableau-style. Imagine the top half of Georgios's graphic with some extra explanatory text. Let's move on with it then. 
