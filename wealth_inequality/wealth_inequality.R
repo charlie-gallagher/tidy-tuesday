@@ -130,9 +130,9 @@ p1 <- w1 %>%
 # Text -------
 ## Data ----
 subtitle_text <- paste(
-  "White households in the United States",
-  "compose 71% of white, Hispanic, and black",
-  "households, but they hold 93% of the wealth.",
+  "In 2016, white households in the United States",
+  "composed 71% of white, Hispanic, and black",
+  "households, but they held 93% of the wealth.",
   "Wealth inequality in the United States is",
   "entrenched in a history of racial",
   "discrimination.",
@@ -142,9 +142,9 @@ subtitle_text <- paste(
 w_text_1 <- tibble(
   text = c("WEALTH\nINEQUALITY", subtitle_text),
   x = c(5, 5),
-  y = c(9.5, 6.5),
+  y = c(9, 6.5),
   family = c("Abril Fatface", "Montserrat Light"),
-  size = c(14, 4),
+  size = c(12, 4),
   hjust = c(0.5),
   vjust = c(1)
 )
@@ -162,8 +162,5 @@ p2 <- ggplot(w_text_1, aes(x = x, y = y, label = text)) +
 
 p_all <- plot_grid(p2, p1, nrow = 1, rel_widths = c(1, 1.3))
 
-ggsave("house.png", p_all, width = 10, height = 5, type = 'cairo')
+ggsave("wealth_inequality.png", p_all, width = 10, height = 5, type = 'cairo')
 
-svg('house.svg', height = 5, width = 10)
-p_all
-dev.off()
