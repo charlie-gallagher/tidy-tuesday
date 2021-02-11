@@ -3,19 +3,23 @@
 
 # Gallery
 ## 2021
-### Week 5
+
+### Week 7
+![wealth inequality](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/wealth_inequality/wealth_inequality.png)
+
+### Week 6
 ![Two year colleges gain against four-year colleges and universities](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/hbcu/hbcu.png)
 
-### Week 4
+### Week 5
 ![Plastic](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/plastic_pollution/plastic_pollution.png)
 
-### Week 3
+### Week 4
 ![Kenyan house materials](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/kenya/kenya.png)
 
-### Week 2
+### Week 3
 ![Tate Art Collection](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/art_collections/art_collection.png)
 
-### Week 1
+### Week 2
 ![Transit costs](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/transit_costs/transit_costs.png)
 
 ## 2020
