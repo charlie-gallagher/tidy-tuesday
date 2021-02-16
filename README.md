@@ -4,6 +4,9 @@
 # Gallery
 ## 2021
 
+### Week 8
+![Dubois Imitation](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/dubois/dubois.png)
+
 ### Week 7
 ![wealth inequality](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/wealth_inequality/wealth_inequality.png)
 
