@@ -66,7 +66,7 @@ p1 <- ggplot() +
             hjust = 1, size = 3.3, family = 'Roboto Th') + 
   labs(
     title = "ASSESSED VALUE OF HOUSEHOLD AND KITCHEN FURNITURE\nOWNED BY GEORGIA NEGROES.",
-    caption = "Font: Olney by Kosal Sen\nSource:  Anthony Starks, Allen Hillery, and Sekou Tyler   |   Inspiration: W. E. B. Dubois   |   Visualization: @charliegallaghr"
+    caption = "Font: Olney by Kosal Sen\nSource:  Anthony Starks, Allen Hillery, and Sekou Tyler   |   Inspiration: W. E. B. Du Bois   |   Visualization: @charliegallaghr"
   ) + 
   coord_polar() + 
   scale_y_continuous(expand = c(0,0), limits = c(-3, 2.61)) +
