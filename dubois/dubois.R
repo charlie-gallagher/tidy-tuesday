@@ -5,6 +5,31 @@ library(extrafont)
 extrafont::loadfonts(device = 'win')
 
 
+# As a minimal working example, here's the structure of the data
+df <- tibble(
+  x = rep(c(0, 10), 5),
+  y = rep(10:5, each = 2)[2:11],
+  g = rep(1:5, each = 2)
+)
+
+ggplot(df, aes(x = x, y = y, group = g)) + 
+  geom_line()
+
+ggplot(df, aes(x = x, y = y, group = g)) + 
+  geom_line() + 
+  coord_polar()
+
+# By adjusting the limits of the y-axis, you can control the density
+# of the spiral
+ggplot(df, aes(x = x, y = y, group = g)) + 
+  geom_line() + 
+  coord_polar() + 
+  ylim(c(0, 10))
+
+
+
+
+
 # Let's map this to the data
 furniture <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-16/furniture.csv')
 names(furniture) <- c('year', 'value')
@@ -16,6 +41,8 @@ names(furniture) <- c('year', 'value')
 # the value of value, so I will just use that
 
 # Unsexy, poorly implemented construction of dataset
+
+# Range of x-axis, or value at which a revolution is completed
 rev_val <- 800000
 
 fur <- furniture %>% 
