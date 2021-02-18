@@ -1,3 +1,4 @@
+# Remaking W.E.B. Du Bois
 For \#TidyTuesday this week, I imitated W.E.B. Du Bois’s graphic on
 furniture value for black families. Here’s is mine next to the original:
 
