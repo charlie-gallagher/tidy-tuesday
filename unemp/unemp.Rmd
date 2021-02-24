@@ -1,0 +1,66 @@
+---
+title: "Unemployment"
+output: html_notebook
+---
+
+
+Doesn't this hit too close to home... Here's the data. 
+
+```{r, message=FALSE}
+library(tidyverse)
+
+emp <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-23/employed.csv')
+
+earn <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-23/earn.csv')
+```
+
+
+```{r}
+skimr::skim(emp)
+```
+
+The first dataset is about employment. It seems there are two variables of interest: `employ_n` and `industry_total`; the first is the number of employed persons and the second is the total number of persons in that industry. Grouping variables are: `industry`, `major_occupation`, `minor_occupation`, and `race_gender`. It's broken down by year. There are missing values for industry, industry total, and number of employed persons (96%, 92%, and 92% complete respectively). The industry total is far greater than the `employ_n` variable; `employ_n` is 9% of `industry_total` at the mean, which aligns more with unemployment numbers rather than employement numbers. Ah, but `industry` total might not be broken down by major and minor occupation. The values might repeat. Years covered are 2015 to 2020. 
+
+```{r}
+skimr::skim(earn)
+```
+
+The second dataset is on weekly median earnings and number of persons employed based on `sex`, `race`, `ethnic_origin`, and `age`. It's broken out by year and quarter. This data is complete with no missing values. Years covered are 2010 to 2020. 
+
+
+I have a vague idea for a graphic based on old blank VHS tapes. See `vhs_tapes.svg` in my `R` folder (not on GitHub). It will require 3-4 bars of comparable heights. There are four values for race, so I could compare earnings. Let's see. 
+
+```{r}
+janitor::tabyl(earn, race)
+
+earn %>% 
+  filter(race != "All Races") %>% 
+  mutate(date = paste0(year, quarter)) %>% 
+  ggplot() + 
+  geom_col(aes(x = date, y = median_weekly_earn, group = race, fill = race),
+           position = position_dodge())
+```
+
+I'll only use the averaged 2020 data. 
+
+```{r}
+e <- earn %>% 
+  filter(race != "All Races", year == 2020) %>% 
+  mutate(
+    month = case_when(
+      quarter == 1 ~ 3,
+      quarter == 2 ~ 6,
+      quarter == 3 ~ 9,
+      quarter == 4 ~ 12
+    ),
+    race = reorder(race, -median_weekly_earn)
+  ) %>% 
+  group_by(race) %>% 
+  summarize(median_weekly_earn = mean(median_weekly_earn)) %>% 
+  ungroup()
+
+ggplot(e) + 
+  geom_col(aes(x = race, y = median_weekly_earn))
+```
+
+Now it's just a matter of making the polygons. The question is whether I should have mitre cuts for edges or 90-degree angles? If it's angles, I only have to use segments. If not, I have to create polygons for each bar where the hypotenuse is mapped to median weekly earnings. I'll make both and see which I like better. 
