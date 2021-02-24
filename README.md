@@ -4,6 +4,9 @@
 # Gallery
 ## 2021
 
+### Week 9
+![Median earnings in US](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/unemp/unemp.png)
+
 ### Week 8
 ![Dubois Imitation](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/dubois/dubois.png)
 
