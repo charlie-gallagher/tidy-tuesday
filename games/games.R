@@ -51,18 +51,9 @@ game_col <- c(
 )
 
 # Subtitle text
-game_blurb <- paste(
-  "Steam is a PC gaming platform and community. On Steam, you",
-  "can launch a game, download games, read and write reviews,",
-  "and join a community of gamers all interested in giving and",
-  "getting the best PC gaming experience.",
-  sep = "\n"
-)
-
-# Blurb text
 game_subtitle = paste(
   "This graphic explores the games with the greatest average",
-  "number of players online since 2012, when Steam launched.",
+  "number of players online since 2012, when the data starts.",
   "Some games, driven by competitive gaming and frequent",
   "updates, have routinely hosted more than 250,000 gamers at",
   "once, on average, for over a decade.",
