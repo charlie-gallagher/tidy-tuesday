@@ -40,7 +40,7 @@ games <- games %>%
 game_col <- c(
   "bg" = "#171a21ff",
   "fg" = "#15324bff",
-  "title" = "#c5c3c0ff",
+  "title" = "#e2e1e0ff",
   "subtitle" = "#a4b4e3ff",
   "blurb" = "#a4b4e3ff",
   "text" = "#485e9eff",
