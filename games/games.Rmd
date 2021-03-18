@@ -1,0 +1,119 @@
+---
+title: "Games"
+output: html_notebook
+---
+
+```{r, message=FALSE}
+library(tidyverse)
+
+games <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-16/games.csv')
+```
+
+There is the data. Let's look into it.
+
+```{r}
+head(games)
+```
+
+It looks like fairly simple data. The unit of observation is the game, year, and month. The variables are average, gain, peak, and average peak percentage. I'm not sure what these mean yet.
+
++------------------------+--------------------------------------------------------------------------------------+
+| Variable               | Meaning                                                                              |
++========================+======================================================================================+
+| `avg`                  | Average number of players at the same time                                           |
++------------------------+--------------------------------------------------------------------------------------+
+| `gain`                 | Gain (or loss) Difference in average compared to the previous month (NA = 1st month) |
++------------------------+--------------------------------------------------------------------------------------+
+| `peak`                 | Highest number of players at the same time                                           |
++------------------------+--------------------------------------------------------------------------------------+
+| `avg_peak_perc`        | Share of the average in the maximum value (avg / peak) in %                          |
++------------------------+--------------------------------------------------------------------------------------+
+
+The metrics have to do with number of players at the same time.
+
+
+```{r}
+skimr::skim(games)
+```
+
+There are 1,258 unique games across all 12 months from 2012 to 2021. There were the most observations in the middle years, it appears from the small histogram. The average number of players at one time is right-skewed. The variable `avg_peak_perc` is being stored as a character, so it needs to be changed. This is just removing the last character (`%`). The data is complete. The missing values in `gain` are caused by each game's first month not having a difference. This is also, incidentally, an indicator for when the game was released on Steam. Notice that there are exactly the same number of missing values in `gain` as there are unique values in `gamename`. 
+
+Maybe this week is the week I try to learn tables with `gt`. But that will delay my entry a few days, and I'd really like to get something out today. 
+
+# The Graphic
+I've decided to do a sort of space-invaders inspired graphic (somewhat accidentally). I need a centerpiece that uses the space well. This might be some modern-looking graphic like a lollipop or a polar lollipop style graphic. Let me see what I can come up with. 
+
+With 83,000 observations, I have too much data to visualize. I need to summarize it in some way that is both interesting and valid. Maybe something like weeks spent at the top of the rankings of most players on average? Let's look at what that might look like. 
+
+First, let's look at a bump chart of rankings over time. For this, I'll need a ranking variable, and I'll need to limit the amount of time I cover. I think I'll change to years instead of months. I need to do some cleaning before this, though. 
+
+
+```{r}
+library(lubridate)
+library(ggbump)
+
+# Certainly unnecessary, but it's efficient
+months <- c("January" = 1, "February" = 2, "March" = 3,
+            "April" = 4, "May" = 5, "June" = 6, "July" = 7, 
+            "August" = 8, "September" = 9, "October" = 10, 
+            "November" = 11, "December" = 12)
+
+games <- games %>% 
+  mutate(
+    month_num = months[month],
+    date = ymd(paste(year, month, '01', sep = '-'))
+  )
+
+rm(months)
+
+
+games_year <- games %>% 
+  group_by(year, gamename) %>% 
+  summarize(
+    avg = mean(avg)
+  ) %>% 
+  group_by(year) %>% 
+  mutate(rank = row_number(-avg)) %>% 
+  arrange(year, rank) %>% 
+  filter(rank <= 10)
+
+games_year
+
+```
+
+```{r}
+games_year %>% 
+  ggplot() + 
+  geom_bump(aes(x = year, y = rank, group = gamename, color = gamename)) + 
+  geom_point(aes(x = year, y = rank, color = gamename))
+```
+
+
+This is impractical. Woof. If I add together all the averages, I can make a crude metric for the most popular games of all time. Ah, but this isn't like an accounting identity, because the base metric is "Average number of players online at one time", which is hard to generalize. 
+
+I can't get too far away from the original data, or I risk having an impossible to understand metric. Man... Not a lot I can go on here and stay in that boundary. Another barrier is that games begin at different times, so I can't just say "this game has the greatest number of players on average over the whole time period," because the time periods change from game to game. Well, let's dive in and look at all games over the whole time period. 
+
+```{r}
+spec_games <- c(
+  "PLAYERUNKNOWN'S BATTLEGROUNDS",
+  "Dota 2",
+  "Counter-Strike: Global Offensive",
+  "Cyberpunk 2077"
+)
+
+games %>% 
+  mutate(
+    specials = case_when(
+      gamename %in% spec_games ~ gamename,
+      TRUE ~ "Other"
+    )
+  ) %>% 
+  ggplot() + 
+  geom_step(aes(x = date, y = avg, group = gamename, color = specials))
+```
+
+Now that's a good looking graphic. I'm almost sold on just that. The step chart adds to the 8-bit feel that is often associated with video games, and there are two major points of interest: supergames like the top three, and quick burners with their stray-hairs look. The rest of the games hover in the lowlands. Let's run with it. 
+
+The big three are PLAYERUNKNOWN'S BATTLEGROUNDS, Dota 2, and Counter-Strike: Global Offensive. Cyberpunk 2077 claims the best initial popularity of any other game, but its popularity quickly died. Looks like this was caused by major bugs and a cyber attack that left the developers unable to access their workstations. 
+
+The colors are fairly easy. The whole graphic will be two toned with some highlights that don't interfere too much. TBD. 

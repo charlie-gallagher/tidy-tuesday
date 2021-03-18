@@ -1,0 +1,71 @@
+---
+title: "Superbowl Ads"
+output: html_notebook
+---
+
+This week's data is on Superbowl advertisements. 
+
+```{r, message=FALSE}
+library(tidyverse)
+library(ggbump)
+sb <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-02/youtube.csv')
+```
+
+```{r}
+skimr::skim(sb)
+```
+
+Okay, so 25 variables, 247 observations, between zero and 25 missing values per variable (0, 16, 22, and 25 are the only values that appear, many repeat). The unit of observation is the advertisement, which is grouped by year and organization. The years range from 2000 to 2020 for 10 unique brands. Each has metadata from YouTube and superbowlads.com. There is a set of logical variables indicating what the watchers concluded about each advertisement, including such variables as funny, shows product quickly, patriotic, and uses sex. The YouTube data such as views, number of comments, likes and dislikes, and so on, give an idea of how popular a given commercial was. 
+
+I don't usually present a lot of data in a small space. I struggle to find decent representations of the data that are also appealing to look at (more elements, more design decisions, much more time spent on the graphic). If I do, I use small multiples. One alternative is to have a three part graphic like SCMP, but most of my attempts there have failed. It's worth a shot -- it's just hard to design. 
+
+Other options are dashboards like those associated with Tableau. As much as I like these dashboards, I rarely look at them in any detail. There is a lot to digest and there is no reason for me to do so. I find these good for putting a lot of information in a small space, but not good for readability. On the other hand, a single plot with complex data tends to grab my attention more, because I don't have to shift focus from one interpretation of a graph to another several times. I suppose the message there is that you can include lots of detail so long as there's one big takeaway. Look at [Frederica Fragapane's](https://www.behance.net/gallery/110024405/Stolen-paintings?tracking_source=search_projects_recommended%7Cstolen%20paintings) "Stolen Paintings." The major message of the graphic is immediately understandable, but the details give almost as much detail as you can stand. It's a mixture of nearly raw data and easy interpretability. 
+
+One style I like is [this](https://images.app.goo.gl/epNgC9ypBbhaZ4vo6) image of a wall of TVs. If I can draw some TVs, that will be the start of a very involved but potentially cool-looking graphic. Maybe I could use that image and make a gif of different data representations. Or use a single TV to the same effect. On second thought, that's a bit hokey.
+
+
+Let's look at the data and then start brainstorming. I'll identify a trend or trends that I want to highlight. 
+
+# The Data
+```{r}
+sb %>% 
+  pivot_longer(cols = funny:use_sex) %>% 
+  select(year, brand, name, value) %>% 
+  group_by(year, name) %>% 
+  summarize(n = sum(value)) %>% 
+  ggplot() + 
+  geom_line(aes(x = year, y = n, group = name, color = name), size = 1)
+```
+
+The same idea but a bump chart: 
+
+```{r}
+sb %>% 
+  pivot_longer(cols = funny:use_sex) %>% 
+  select(year, brand, name, value) %>% 
+  group_by(year, name) %>% 
+  summarize(n = sum(value), .groups = "drop") %>% 
+  group_by(year) %>% 
+  mutate(rank = row_number(n)) %>% 
+  ggplot() +
+  geom_bump(aes(x = year, y = rank, group = name, color = name), size = 1)
+```
+
+Sex seems like it's pretty much out. Let me highlight that. 
+
+```{r}
+sb %>% 
+  pivot_longer(cols = funny:use_sex) %>% 
+  select(year, brand, name, value) %>% 
+  group_by(year, name) %>% 
+  summarize(n = sum(value), .groups = "drop") %>% 
+  group_by(year) %>% 
+  mutate(rank = row_number(n),
+         is_sex = name == "use_sex"
+  ) %>% 
+  ggplot() +
+  geom_bump(aes(x = year, y = rank, group = name, color = is_sex), size = 1) + 
+  scale_color_manual(values = c(grey(0.6), 'red'))
+```
+
+That's a pretty clear trend, and a very good headline. "Sex is Out." Neat. 
