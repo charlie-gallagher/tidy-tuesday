@@ -4,6 +4,9 @@
 # Gallery
 ## 2021
 
+### Week 12
+![Video games on Steam](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/games/games.png)
+
 ### Week 9
 ![Median earnings in US](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/unemp/unemp.png)
 
