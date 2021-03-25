@@ -1,0 +1,336 @@
+---
+title: "UN Votes"
+output: html_notebook
+---
+
+This week's data is on United Nations votes, from Harvard's Database.
+
+```{r, message=FALSE}
+library(tidyverse)
+
+unvotes <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-23/unvotes.csv')
+roll_calls <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-23/roll_calls.csv')
+issues <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-23/issues.csv')
+```
+
+
+Let's take a look at each one. 
+
+```{r}
+head(unvotes)
+head(issues)
+head(roll_calls)
+```
+
+Interesting. `unvotes` includes data on the RCID (roll call ID), looking at each country's vote for each roll call and their vote. It is accompanied by a two-character country code for each country. 
+
+`issues` has RCID, a shortname for the issue, and the issue itself, such as "Palestinian conflict."
+
+`roll_calls` has a session number, an indicator for whether the vote was classified as "important" by the US State department report, a date of the vote, resolution code, whether an amendment, a paragraph, and accompanied by a short description and a long description. Both `amend` and `para` are coded only until 1985, and all variables after `importantVote` apparently begin after session 39, even though there is data before then. 
+
+Let's skim. 
+
+```{r}
+skimr::skim(roll_calls)
+```
+
+As expected, `amend` and `para` have a lot of missing data, and the others have only a little (roughly 10% for most incomplete variables). 
+
+Votes include "Yes", "No", and "Abstain."
+
+I think, off the top of my head, a network analysis would be interesting here. For a given decade, are there groups of Yeses and Nos? In other words, look at the network of countries who vote Yes on the same issues. If anyone has already done this, I don't care. It'll still be interesting. Time to review my networking knowledge...
+
+Also, there are a few ways countries can vote together. On the one hand, they can vote on similar issues similarly. On the other hand, they can vote often together regardless of the issue. The latter is what I'm interested in. That is, I'm interested in large overlaps of issues between countries to identify maybe political influences. 
+
+# Network Specification
+The network will have to connect two countries if their votes are the same on an issue. Let's do this for a single issue, then I can try to generalize for several issues across some time span. 
+
+```{r}
+net <- unvotes %>% 
+  filter(rcid == 4807L)
+
+net <- net %>% 
+  left_join(issues, by = "rcid")
+```
+
+Here is a randomly selected RCID for a vote on Human Rights. It features a goodly number of countries (183) and a variety of votes. 
+
+There should be one observation for each country-to-country pair. That means a full self-join on country, filtered by vote equality. 
+
+```{r}
+full_net <- net %>% 
+  group_by_all() %>% 
+  summarize(other_country = net$country, .groups = "drop") %>% 
+  left_join(select(net, country, vote), by = c("other_country" = "country")) %>% 
+  rename(vote = vote.x, other_vote = vote.y) %>% 
+  filter(vote == other_vote & country != other_country) %>% 
+  select(country, other_country, vote, everything())
+
+full_net
+```
+
+There might be an easier way to do this, but it works well enough. Now `full_net` is the makings of a full bidirectional graph. There are 12,357 connections among 183 countries. 
+
+```{r, message=FALSE}
+library(igraph)
+library(tidygraph)
+library(ggraph)
+
+net_graph <- graph_from_data_frame(full_net, directed = TRUE, vertices = select(net, country, everything()))
+
+net_graph
+```
+
+
+Now, plotting this might be dangerous, so let's do only a reduced dataset. 
+
+```{r}
+# full_net <- net %>% 
+#   slice_sample(n = 30) %>% 
+#   group_by_all() %>% 
+#   summarize(other_country = net$country, .groups = "drop") %>% 
+#   left_join(select(net, country, vote), by = c("other_country" = "country")) %>% 
+#   rename(vote = vote.x, other_vote = vote.y) %>% 
+#   filter(vote == other_vote & country != other_country) %>% 
+#   select(country, other_country, vote, everything())
+# 
+# net_graph <- graph_from_data_frame(full_net, directed = TRUE, vertices = select(net, country, everything()))
+
+ggraph(net_graph) + 
+  geom_node_point() + 
+  geom_edge_diagonal()
+```
+
+Messy, but probably correct? Its hard to see how many points are in the center of each cluster, but theoretically, there are a total of 30 dots all connected to the outer (not included in LHS) countries. This is 2,187 observations. Let's do the whole thing. 
+
+It's hairy. I rendered it with base graphics so I could blow it up. I think this is not necessarily the way to go with this graphic. Ways I can reduce it: 
+
+- reduce number of countries considered
+- reduce types of votes considered
+- Give edges attributes such as "number of times voted together," and make 
+that the edge between the two countries
+- Keep only one edge between two countries
+
+
+Here's how I'm going to shake it out. Countries will include: 
+
+- European Union
+- United States
+- Russia, China, Saudi Arabia
+
+These are not exactly randomly chosen, but are supposed to be wide enough to be interesting. 
+
+```{r}
+library(countrycode)
+
+countrycode::codelist
+```
+
+
+Maybe instead I'll do only OECD countries, of which there are 37. I'll need a list of them. 
+
+```{r}
+# Vector of OECD countries in ISO-2 character
+oecd <- readr::read_csv('oecd.csv') %>% 
+  pull(LOCATION) %>% unique() %>% 
+  countrycode::countrycode("iso3c", "iso2c")
+
+oecd <- oecd[!is.na(oecd)]
+```
+
+
+With this data I can make the reduction easily. 
+
+```{r}
+net <- filter(net, country_code %in% oecd)
+
+full_net <- net %>%
+  group_by_all() %>%
+  summarize(other_country = net$country, .groups = "drop") %>%
+  left_join(select(net, country, vote), by = c("other_country" = "country")) %>%
+  rename(vote = vote.x, other_vote = vote.y) %>%
+  filter(vote == other_vote & country != other_country) %>%
+  select(country, other_country, vote, everything())
+
+net_graph <- graph_from_data_frame(full_net, directed = TRUE, vertices = select(net, country, everything()))
+```
+
+Now there are only 1,514 edges for a single issue. This will probably remain constant. I'm not sure about an efficent way to ensure that each edge appears only once, so let me think about this problem before selecting more roll calls.
+
+### One edge per pair
+Assume the countries are alphabetically arranged. I need a dataset where each country's edges appear only once. For that, I will need to do something like this: append to each country all other countries that come after it. That would be easy for a single issue, but when you have multiple issues that problem gets a little hairier. 
+
+I need a better way to expand the dataset with all combinations of countries that come after a certain country. One way is with a loop, but that'll be a little messy here. Ideally, I could have a non-destructive way to test this. 
+
+```{r}
+full_net <- net %>%
+  group_by_all() %>%
+  summarize(other_country = net$country[net$country > country], .groups = "drop") %>%
+  left_join(select(net, country, vote), by = c("other_country" = "country")) %>%
+  rename(vote = vote.x, other_vote = vote.y) %>%
+  filter(vote == other_vote & country != other_country) %>%
+  select(country, other_country, vote, everything())
+
+net_graph <- graph_from_data_frame(full_net, directed = TRUE, vertices = select(net, country, everything()))
+```
+
+
+Whew, thanks to alphabetization being sortable, this was a cinch. Nice. I reduced the number of edges from 1,514 to 757. 
+
+
+### Code so far
+```{r}
+library(tidyverse)
+library(igraph)
+library(tidygraph)
+library(ggraph)
+library(countrycode)
+
+# Get data -------
+unvotes <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-23/unvotes.csv')
+roll_calls <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-23/roll_calls.csv')
+issues <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-23/issues.csv')
+
+
+# Make net dataset --------
+net <- unvotes %>% 
+  filter(rcid == 4807L) %>% 
+  left_join(issues, by = "rcid")
+
+# Vector of OECD countries in ISO-2 character
+oecd <- read_csv('oecd.csv') %>% 
+  pull(LOCATION) %>% unique() %>% 
+  countrycode("iso3c", "iso2c")
+
+oecd <- oecd[!is.na(oecd)]
+
+net <- filter(net, country_code %in% oecd)
+
+
+# undirected graph data --------
+full_net <- net %>%
+  group_by_all() %>%
+  summarize(other_country = net$country[net$country > country], 
+            .groups = "drop") %>%
+  left_join(select(net, country, vote), by = c("other_country" = "country")) %>%
+  rename(vote = vote.x, other_vote = vote.y) %>%
+  filter(vote == other_vote & country != other_country) %>%
+  select(country, other_country, vote, everything())
+
+net_graph <- graph_from_data_frame(full_net, directed = TRUE, vertices = select(net, country, everything()))
+```
+
+
+### Selection of Issues
+I would like some uniformity, both to limit the scope and make the data more valid. So, what should be included? Probably all votes that are considered "Important" by the US State Department in a given year. I can facet without affecting the layout of the graph, which will help visualize changes over time. Let's do all important issues in the first year of each decade from 1950 to 2000. 
+
+The "important" flag isn't applied until 1983, so I would only get 1990 and 2000 (N = 3000). Instead, I'm going to try using all important votes since 1983, which as N = 88,679. Probably, this is way to many, but it'll reduce a bit as it goes on. For now, I'll reduce it further to half decades since 1980. 
+
+```{r}
+decades <- seq(1950, 2000, 10)
+
+net <- unvotes %>% 
+  left_join(select(roll_calls, rcid, importantvote, date), by = 'rcid') %>% 
+  mutate(year = lubridate::year(date)) %>% 
+  filter(year %in% 2010 & 
+           importantvote == 1) %>% 
+  left_join(issues, by = "rcid")
+
+
+# Vector of OECD countries in ISO-2 character
+oecd <- read_csv('oecd.csv') %>% 
+  pull(LOCATION) %>% unique() %>% 
+  countrycode("iso3c", "iso2c")
+
+oecd <- oecd[!is.na(oecd)]
+
+net <- filter(net, country_code %in% oecd)
+
+
+# undirected graph data --------
+full_net <- net %>%
+  group_by_all() %>%
+  summarize(other_country = net$country[net$country > country], 
+            other_rcid = net$rcid[net$country > country],
+            .groups = "drop") %>%
+  left_join(select(net, country, rcid, vote), by = c("other_country" = "country", "other_rcid" = "rcid")) %>%
+  rename(vote = vote.x, other_vote = vote.y) %>%
+  filter(vote == other_vote) %>%
+  select(country, other_country, vote, everything())
+
+```
+
+
+If I try to graph this, I'll have to graph more than 9 million edges. That's going to take a very long time. 
+
+Let's reduce again. Maybe first year of decades starting with 1990; that's only 4 years, instead of the current 20 or so. 1 million edges. That's still a large number of edges, so let me reduce it again to a single year, just so I can see what it looks like. There should be roughly 250,000 observations. Spot on! Let's turn this into a graph. I chose 2010, for no reason. 
+
+
+```{r}
+net_vertices <- net %>% 
+  filter(rcid == 5049) %>% 
+  select(country, country_code)
+
+net_graph <- graph_from_data_frame(full_net, directed = FALSE, vertices = net_vertices)
+
+# ggraph(net_graph, layout = "stress") + 
+#   geom_edge_diagonal(aes(edge_colour = vote))
+```
+
+Oof I got a memory allocation error. Calculating the stress layout must be pretty memory consuming, plus I have a lot of stuff in here as it is. But still, I'm shocked, because my largest dataset is 27 MB. If I'm going to free up 96 MB, well I just don't have it. I gues I need even fewer edges. 
+
+Okay, the content of the votes is next. What are the different categories? Which are likely to have some variation? 
+
+```{r}
+janitor::tabyl(issues, issue)
+```
+
+Surprisingly, "Human rights" is one of the more controversial.
+
+```{r}
+net <- unvotes %>% 
+  left_join(select(roll_calls, rcid, importantvote, date), by = 'rcid') %>% 
+  mutate(year = lubridate::year(date)) %>% 
+  left_join(issues, by = "rcid") %>% 
+  filter(year %in% seq(1980, 2020, 10) & 
+         importantvote == 1 & 
+         issue == "Human rights")
+
+
+# Vector of OECD countries in ISO-2 character
+oecd <- read_csv('oecd.csv') %>% 
+  pull(LOCATION) %>% unique() %>% 
+  countrycode("iso3c", "iso2c")
+
+oecd <- oecd[!is.na(oecd)]
+
+net <- filter(net, country_code %in% oecd)
+
+
+# undirected graph data --------
+full_net <- net %>%
+  group_by_all() %>%
+  summarize(other_country = net$country[net$country > country & net$rcid == rcid], 
+            other_rcid = net$rcid[net$country > country & net$rcid == rcid],
+            .groups = "drop") %>%
+  left_join(select(net, country, rcid, vote), by = c("other_country" = "country", "other_rcid" = "rcid")) %>%
+  rename(vote = vote.x, other_vote = vote.y) %>%
+  filter(vote == other_vote) %>%
+  select(country, other_country, vote, everything())
+
+net_vertices <- net %>% 
+  select(country, country_code) %>% unique()
+
+net_graph <- graph_from_data_frame(full_net, directed = FALSE, vertices = net_vertices)
+
+ggraph(net_graph, layout = 'stress') + 
+  geom_edge_diagonal(aes(edge_colour = vote))
+```
+
+There are now 16 votes across 1990-2020 dealing with human rights. There were 609 votes cast among 38-ish countries, and still I'm getting too many observations. And the reason is obvious. I'm using all the data every time. Oops. Okay, observations reduced to only 8000, which makes sense. 
+
+
+That's I'll I have time for this morning. Hopefully tomorrow I can make a little more progress. 
+
+---
+Charlie Gallagher, 2021
