@@ -4,6 +4,9 @@
 # Gallery
 ## 2021
 
+### Week 14
+![makeup shades](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/makeup_shades/makeup_shades.png)
+
 ### Week 13
 ![UN Votes](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/unvotes/unvotes.png)
 
