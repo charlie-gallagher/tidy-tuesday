@@ -1,0 +1,215 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Makeup shades for this week's data. It's an interesting phenomenon, so hopefully something interesting will come out of it. I did some reading already, but I'll try not to let it influence my direction too much. I'd like to do something straightforward this week, a graphic you might see in a magezine, for example.  
+
+```{r, message=FALSE}
+library(tidyverse)
+sephora <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-30/sephora.csv')
+ulta <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-30/ulta.csv')
+allCategories <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-30/allCategories.csv')
+allShades <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-30/allShades.csv')
+allNumbers <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-30/allNumbers.csv')
+```
+
+
+There are a five datasets this week: 
+
+- **allCategories** Data on product name categories
+- **allNumbers** Data on product numbers (?)
+- **allShades** Data on the specific shade (hue, saturation, hex, colorspace, etc.)
+- **sephora** Formatted the same as `ulta`. The data comes from the Sephora website.
+- **ulta** Formatted the same as `sephora`. The data comes from the Ulta website.
+
+It looks like the `all*` datasets are combinations of the makeup in both sephora and ulta, but at the same time they contain data that those datasets don't. There is very little overlap between their variables. The variables in the store datasets are more raw, clearly straight from the website. The `all*` datasets contain such values as `hex`, `hue`, `sat`, and `lightness`. In fact, those are the only new variables added, so it seems those datasets are produced from some further data processing. 
+
+Hey here's a snippet that will get all variable names in the global environment. 
+
+```{r}
+lapply(as.list(globalenv()), names)
+```
+
+Still, it would be better not to have to copy the whole environment before getting the names back. How can you query get the names of each dataset individually without copying the things? robably you can use `get` with `ls()` in a function. Let me try what I mean. 
+
+```{r}
+lapply(ls(), function(str) names(get(str)))
+```
+
+This is faster but you don't get the names of each object. You could customize the function a little more to do this, though. And with `map`, for practice and brevity. 
+
+```{r}
+map(ls(), ~names(get(.x)))
+```
+
+Nice. Okay, back to work. 
+
+# Graphic Aesthetic
+I would like to have nothing fancy. I want a clean graphic, somewhat traditional, with good labeling. Something you might see in an Economist piece, for example. That means clearly labeled axes, good annotations, a single data message, and traditional titling, among other things. Light background, good font, subtle lines and some form of highlighting using shade, transparency, or boldness. Accessibility is important here. 
+
+Now, I need a message. Obviously, the data was collected to demonstrate the bias of colors towards lighter tones, but there are many dimensions to this. Names are a pain and not so interesting to me, so I'm going to try to avoid those. The hue, saturation, and lightness values are interesting and numeric. So are hex codes for the colors, if you take a second to convert to numeric. 
+
+I think a bunch of hex tiles would be a cool visualization of this data. How do hex tiles work in `ggplot2`? `geom_hex` projects 2D data onto a plane of regular hexagons, and counts the number of cases in each hexagon. The number of cases is mapped to hexagon fill. That's not right... I would like a basic tiling where each tile represents one shade of makeup. `x` is the lightness, `y` is just a stacking to avoid overlaps. It's not a trivial problem, I think. 
+
+To get started, let's see what the grid might look like by plotting the colors on a cartesian plane with `x = lightness` and `y = sat`. I'll use the `allShades` dataset.
+
+```{r}
+allShades %>% 
+  ggplot() + 
+  geom_point(aes(x = lightness, y = sat), color = allShades$hex, shape = 'square') + 
+  theme_minimal() + theme(plot.background = element_rect(fill = 'black'))
+```
+
+This seems like a good way to group the data. Naturally you need a third dimension to plot the colors properly, but in the case of these generally uniform colors, lightness and saturation do okay. 
+
+```{r}
+allShades %>% 
+  ggplot() + 
+  geom_point(aes(x = lightness, y = hue), color = allShades$hex, shape = 'square') + 
+  coord_cartesian(ylim = c(0, 65)) + 
+  theme_minimal() + theme(plot.background = element_rect(fill = 'black'))
+```
+
+
+Let's see what this looks like in a hexagonal grid. 
+
+```{r}
+allShades %>% 
+  filter(hue < 65) %>% 
+  ggplot() + 
+  geom_hex(aes(x = lightness, y = hue))
+```
+
+Well, back to the drawing board, then. 
+
+
+Key to a graphic for a magazine is a story. The graphic should have a lot of information, but the reader should be directed to one major point or message. It's a sort of layer-sublayer type of design, although when it comes to actual design, such high concepts aren't too useful beyond big picture. 
+
+Nothing comes without some understanding of the data, though. Let's look more. 
+
+# More Data Exploring
+I've looked at shades. Let's look at categories? That's names. Maybe some extra context can be gained in the visualizations they used on the website if you get rid of duplicates. Sure, light color makeup is more likely to be named after a 'gem', but most of these are going to be ivory, right? What happens when you eliminate duplicates? 
+
+It's tricky. Yes, light colors tend to have the name 'ivory', for example, but how can you correct for that? Certainly ivory is going to apply to a range of shades. That's why they made categories, so that you could see the range of items labeled something _similar to_ ivory. It's effective in the sense that there are 1,155 unique color names that fit into some category, and you can see that the categories are not evenly distributed across the color spectrum. 
+
+Man... I'm just hurting for inspiration. Maybe a range graphic would suit me well this week. Okay, here's an idea: Two circles connected by a line. The circles represent the lightest and darkest shades in a makeup line, and the line connects them. `x` is lightness, `y` is some other metric to be decided. The circles are inversely proportional, so if a makeup line has more light colors than dark colors, the light-side circle is larger. Maybe they should be squares... The actual color of the squares is of course the color they represent. This is going to be quite hard, though. Maybe a sort of gunshot chart is in order. Something like a comet tail that grows towards the side with more colors (light or dark). But then I lose the ability to actually represent the lightest and darkest colors. 
+
+Let me just see how difficult the first idea would be. Here's the basic shape. 
+
+```{r}
+df <- tibble(
+  part = c('sq1', 'sq2'),
+  x = c(0, 1),
+  size = c(0.5, 2.5),
+  y = c(1, 1)
+)
+
+df %>% 
+  ggplot() + 
+  geom_line(aes(x = x, y = y)) + 
+  geom_point(aes(x = x, y = y, size = size),
+             shape = 'square') + 
+  coord_cartesian(xlim = c(-1, 2))
+```
+
+That's the basic idea. The hard part is that I want to distinguish between the lightest and the darkest colors by having the lightest color be below the line and the darkest above the line. That will require a rectangle, not a square, or a fixed size and aspect ratio. Either way. It's complicated because in one case, the line is the max height of the box, and in the other it's the minimum height. And even then, it might just not look good. Let's plot like I did above with the real data. The `y` axis will be brand. 
+
+I need the `allNumbers` dataset, and only those brands with numbers. The `id` variable gives you a particular makeup line, so `id` can be the `y` axis to avoid any confusion. The size of the box is mapped to the lightness, and I only need to keep the max and min from each makeup line. 
+
+```{r}
+some_numbers <- allNumbers %>% 
+  group_by(id) %>% 
+  mutate(max_n = max(numbers, na.rm = TRUE),
+         min_n = min(numbers, na.rm = TRUE)) %>% 
+  filter((numbers == max_n) | (numbers == min_n)) %>% 
+  arrange(id) %>% 
+  select(brand, product, id, lightness, hex, numbers)
+```
+
+
+And plotting.
+```{r}
+some_numbers %>% 
+  ggplot() + 
+  geom_point(aes(x = lightness, y = id), shape = 'square') + 
+  geom_line(aes(x = lightness, y = id, group = id))
+```
+
+That's starting to look like something. I need to order by lightness and make a metric for the size of each square. 
+
+The size of the light squares is mapped to the amount light shades are 'favored' in the palette; and the opposite for dark shades. I can use the skewness of the dataset for this. 
+
+```{r}
+allNumbers %>% 
+  filter(id <= 10) %>% 
+  group_by(id) %>% 
+  mutate(skew = moments::skewness(lightness)) %>% 
+  ggplot() + 
+  geom_density(aes(x = lightness)) + 
+  facet_wrap(vars(id))
+```
+
+A negative skew implies that lighter colors are predominant, and a positive skew implies that darker colors are predominant. There are no positively skewed brands that I see. 
+
+How can I map the size of two squares to skewness? Off the top of my head, use the  value of the skewness as a negative weight on the lighter square, a positive weight on the darker square. More skewness should result in a larger weight, though, and all of the squares should have the same base size. Maybe I can just subtract skewness from the lighter square and add it to the darker square. If I multiply, that would work too, I guess. 
+
+```{r}
+some_numbers <- allNumbers %>% 
+  group_by(id) %>% 
+  mutate(max_n = max(numbers, na.rm = TRUE),
+         min_n = min(numbers, na.rm = TRUE),
+         skew = moments::skewness(lightness)) %>% 
+  filter((numbers == max_n) | (numbers == min_n)) %>% 
+  arrange(id) 
+
+some_numbers <- some_numbers %>% 
+  mutate(
+    weight = case_when(
+    numbers == max_n ~ 100 * skew,
+    numbers == min_n ~ (-100) * skew,
+      ),
+    mean_light = mean(lightness)
+  ) %>% 
+  ungroup() %>% 
+  mutate(id = reorder(id, mean_light))
+
+some_numbers %>% 
+  ggplot() + 
+  geom_point(aes(x = lightness, y = id, size = weight), 
+             shape = 'square', alpha = 0.35) + 
+  geom_line(aes(x = lightness, y = id, group = id)) + 
+  geom_point(aes(x = mean_light, y = id), shape = 'plus')
+```
+
+This seems to have the right effect... I added a line for the mean shade, and this adds a little more randomness to the placement of the left and right squares. Let's add the shades now. 
+
+```{r}
+some_numbers %>% 
+  ggplot() + 
+  geom_point(aes(x = lightness, y = id, size = weight), 
+             shape = 'square', alpha = 1, color = some_numbers$hex) + 
+  geom_line(aes(x = lightness, y = id, group = id)) + 
+  geom_point(aes(x = mean_light, y = id), shape = 'plus')
+```
+
+Starting to look effective. I wonder if I could make the ordering just a little better. What if I order by skew? 
+
+```{r}
+some_numbers %>% 
+  group_by(id) %>% mutate(max_weight = max(weight, na.rm = TRUE)) %>% ungroup() %>% 
+  mutate(id = reorder(id, max_weight)) %>% 
+  ggplot() + 
+  geom_point(aes(x = lightness, y = id, size = weight), 
+             shape = 'square', alpha = 1, color = some_numbers$hex) + 
+  geom_line(aes(x = lightness, y = id, group = id)) + 
+  geom_point(aes(x = mean_light, y = id), shape = 'plus')
+```
+
+Nope, that's no good. Okay, let's stick with ordering by mean and get to making this look good. 
+
+
+
+
+---
+Charlie Gallagher, 2021
