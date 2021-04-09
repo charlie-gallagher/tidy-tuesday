@@ -1,0 +1,89 @@
+---
+title: "Deforestation"
+output: html_notebook
+---
+
+
+
+```{r, message=FALSE}
+library(tidyverse)
+
+
+forest <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-04-06/forest.csv')
+forest_area <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-04-06/forest_area.csv')
+brazil_loss <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-04-06/brazil_loss.csv')
+soybean_use <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-04-06/soybean_use.csv')
+vegetable_oil <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-04-06/vegetable_oil.csv')
+```
+
+So, there are 5 datasets for this week's data on deforestation. It's my first week at Ixis, so I can't devote too much time or energy to this, but it looks like interesting data. 
+
+An explanation of each dataset follows: 
+
+- `brazil_loss` Loss of Brazilian forests due to certain causes
+- `forest` 'net forest conversion' for each country, one observation every five years. 
+- `forest_area` Change in global forest area as a percent of global forest area
+- `soybean_use` Soybean production and use by each country per year and country
+- `vegetable_oil` Vegetable oil production by crop type, country, and year
+
+I was looking at balance, white space, and accents recently. As I'm reviewing my graphic, I'd like to keep these in mind. 
+
+# Picking a Dataset
+Having 200+ countries always creates graphics problems. I don't want to do another heat map, but I also would like to avoid scrounging for country code data, what defines 'European' and so on. The Brazil dataset avoids all that. Picking any specific country will fix the country problem, really. 
+
+Last week I set out to do something traditional and I ended up with something new age. Maybe this week I should revert back to traditional, then, even if it means not doing a nice minimalist graphic. 
+
+I guess I should look at some of the data and see what _it_ wants to say. Which data? Soybean use.
+
+```{r}
+soybean_use %>% 
+  filter(grepl("America", entity)) %>% 
+  janitor::tabyl(entity)
+```
+
+Perfect, the Americas. Looks good enough to me! Let's see what the data looks like. 
+
+```{r}
+soy <- soybean_use %>% 
+  filter(entity %in% c('Northern America', 'South America')) %>% 
+  pivot_longer(cols = c(human_food, animal_feed, processed))
+
+soy
+```
+
+```{r}
+ggplot(soy) + 
+  geom_line(aes(x = year, y = value, group = entity,
+                color = entity)) + 
+  facet_wrap(vars(name), scales = 'free', nrow = 3)
+```
+
+This is what I have to work with. I'll make it work. But then, part of the interest in a data visualization is not that you've visualized some data, but you've visualized some _interesting_ data, something that tells a story. Unless I can find a story here, I'll need to keep looking. 
+
+One obvious problem is that the numbers aren't normalized in any way, and for agriculture that matters quite a bit. But there's some interesting data comparing North America to South America and animal feed to human feed. 
+
+One thing I like is the way South America's processed soybeans overtake North(ern) America's processed soybeans. 
+
+```{r}
+soy %>% 
+  filter(name == "processed") %>% 
+  mutate(value_mil = round(value / 1000000, digits = 1)) %>% 
+  ggplot() + 
+  geom_line(aes(x = year, y = value_mil, color = entity),
+            size = 1.5) + 
+  scale_color_manual(values = c('#32bd0c55', '#32bd0cff')) + 
+  guides(color = FALSE) +
+  theme_void() + 
+  theme(
+    text = element_text(color = '#999999'),
+    plot.background = element_rect(color = NA, fill = '#44434bff'),
+    plot.margin = margin(25, 25, 25, 25),
+    panel.grid.major.y = element_line(color = '#777777', linetype = '28'),
+    axis.text = element_text(color = '#999999')
+  )
+```
+
+That's starting to look like something, I guess. It's certainly traditional. It doesn't have much of interest, though. 
+
+---
+Charlie Gallagher, April 2021
