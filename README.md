@@ -4,6 +4,9 @@
 # Gallery
 ## 2021
 
+### Week 15
+![Deforestation graphic](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/deforestation/deforestation.png)
+
 ### Week 14
 ![makeup shades](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/makeup_shades/makeup_shades.png)
 
