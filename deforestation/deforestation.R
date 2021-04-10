@@ -30,7 +30,7 @@ p1 <- soy %>%
     plot.subtitle = element_text(family = 'IBM Plex Sans Light', face = 'italic',
                                  size = 12, margin = margin(32, 0, 20, 0)),
     plot.caption = element_text(size = 10, margin = margin(20, 0, 0, 0)),
-    plot.background = element_rect(color = NA, fill = '#44434bff'),
+    plot.background = element_rect(color = NA, fill = '#36353b'),
     plot.margin = margin(25, 45, 12, 45),
     panel.grid.major.y = element_line(color = '#777777', linetype = '28'),
     axis.text = element_text(color = '#999999', margin = margin(0, 10, 0, 0))
@@ -73,7 +73,7 @@ p2 <- soy %>%
     plot.subtitle = element_text(family = 'IBM Plex Sans Light', face = 'italic',
                                  size = 16, margin = margin(32, 0, 50, 0)),
     plot.caption = element_text(size = 10, margin = margin(20, 0, 0, 0)),
-    plot.background = element_rect(color = NA, fill = '#44434bff'),
+    plot.background = element_rect(color = NA, fill = '#36353b'),
     plot.margin = margin(25, 35, 12, 35),
     panel.grid.major.y = element_line(color = '#777777', linetype = '28'),
     axis.text = element_text(color = '#999999', size = 14, 
