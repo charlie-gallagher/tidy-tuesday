@@ -4,6 +4,9 @@
 # Gallery
 ## 2021
 
+### Week 16
+![Postal service graphic](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/postal_service/postal_service.png)
+
 ### Week 15
 ![Deforestation graphic](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/deforestation/deforestation.png)
 
