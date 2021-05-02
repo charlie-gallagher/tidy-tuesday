@@ -1,5 +1,6 @@
 library(tidyverse)
 library(ggtext)
+library(extrafont)
 library(systemfonts)
 library(cowplot)
 
@@ -129,7 +130,7 @@ nfx_subtitle_text <- paste(
 ## Data plot ----
 p1 <- final_nfx %>% 
   ggplot() + 
-  geom_point(aes(x = x, y = y, fill = degree), size = ifelse(final_nfx$degree == 'kevin_bacon', 2, 2), color = '#005862ff', shape = 21) + 
+  geom_point(aes(x = x, y = y, fill = degree), size = ifelse(final_nfx$degree == 'kevin_bacon', 2, 2), color = '#88f7ff99', shape = 21) + 
   labs(
     title = 'Six degrees of <span style="color:#005862">Kevin Bacon</span>', 
     subtitle = nfx_subtitle_text,
@@ -146,13 +147,13 @@ p1 <- final_nfx %>%
     plot.subtitle = element_text(color = '#777777', family = 'IBM Plex Sans', size = 14),
     plot.caption = element_text(color = '#777777', family = 'IBM Plex Sans', size = 10),
     plot.background = element_rect(fill = 'white', color = NA),
-    plot.margin = margin(10, 0, 0, 10)
+    plot.margin = margin(10, 0, 10, 10)
   )
 
 ## Image plot ----
 pimage <- ggdraw(p1) + 
-  cowplot::draw_image('kevin-bacon-celebrity-mask.png', x = 0.505, y = 0.435, hjust = 0.5, vjust = 0.5,
-                      scale = 0.09)
+  cowplot::draw_image('kevin-bacon-celebrity-mask.png', x = 0.515, y = 0.445, hjust = 0.5, vjust = 0.5,
+                      scale = 0.07)
 
 ragg::agg_png('netflix.png', height = 2411, width = 2200, res = 300)
 pimage
