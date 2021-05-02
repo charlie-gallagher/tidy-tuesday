@@ -4,6 +4,9 @@
 # Gallery
 ## 2021
 
+### Week 17
+![Six degrees of Kevin Bacon](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/netflix/netflix.png)
+
 ### Week 16
 ![Postal service graphic](https://github.com/charlie-gallagher/tidy-tuesday/blob/master/postal_service/postal_service.png)
 
