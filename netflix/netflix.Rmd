@@ -1,0 +1,154 @@
+---
+title: "Netflix Titles"
+output: html_notebook
+---
+
+This week's data is on Netflix titles. 
+
+
+```{r setup, message=FALSE}
+library(tidyverse)
+```
+
+
+```{r}
+netflix_titles <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-04-20/netflix_titles.csv')
+
+head(netflix_titles)
+```
+
+This is pretty straightforward, like most data from Kaggle. You have an ID
+variable, type, title, director, cast, country, date_added, release year,
+rating, duration, list section, and description.
+
+```{r}
+names(netflix_titles)
+```
+
+There are a few interesting things to do with this data. You can look at when
+Netflix was adding shows and when they slowed down, the average release year for
+different years, countries and country biases, actor and actress networks. What
+if I looked at the six degrees of Kevin Bacon... Actually, it could conceivably
+be too computationally heavy. Director relationships are another possibility.
+But I just don't much want to munge the data that much. The actor names are
+comma and space separated, with some potential messiness. Will check. Actually
+it looks very good.
+
+There are six movies that feature Kevin Bacon. To make, say, three degrees, I
+need three mutually exclusive sets: people who have been in the same movie as
+Kevin Bacon, people who have not been in a movie with Kevin Bacon, but were in a
+movie with someone who was in a movie with Kevin Bacon, and people who were not
+in a movie with Kevin Bacon, weren't in a movie with someone who was in a movie
+with Kevin Bacon, but were in a movie with someone from group 2, those who were
+in a movie with someone who was in a movie with someone in Kevin Bacon.
+
+You should be able to do this fairly efficiently, considering you only need to
+search level `N + 1`, where N is the degree of separation from KB. I'll need to
+make sure there are no repeats in different groups, though. Will that take care
+of itself?
+
+Anyway, I need to make this more specific anyway. First, I need to parse the cast of each movie. 
+
+I think I can use summarize to do this pretty nicely. 
+
+```{r}
+nfx <- netflix_titles %>% group_by(title, director) %>% 
+  summarize(
+    individual_name = unlist(str_split(cast, ", "))
+  )
+```
+
+Now, all I need to do is make an indicator for each person to see whether they were in the same movie as Kevin Bacon. Is this going to be painful? Maybe not. Just a list of movies he's been in could work. 
+
+```{r}
+bacon_flicks <- nfx %>% filter(individual_name == 'Kevin Bacon') %>% 
+  pull(title)
+
+
+first_removed_actors <- nfx %>% filter(title %in% bacon_flicks) %>% 
+  pull(individual_name) %>% 
+  unique()
+
+first_removed_movies <- nfx %>% 
+  filter(individual_name %in% first_removed_actors) %>% 
+  pull(title) %>% 
+  unique()
+
+
+second_removed_actors <- nfx %>% filter(title %in% first_removed_movies) %>% 
+  pull(individual_name) %>% 
+  unique()
+
+second_removed_movies <- nfx %>% 
+  filter(individual_name %in% second_removed_actors) %>% 
+  pull(title) %>% 
+  unique()
+
+third_removed_actors <- nfx %>% filter(title %in% second_removed_movies) %>% 
+  pull(individual_name) %>% 
+  unique()
+
+third_removed_movies <- nfx %>% 
+  filter(individual_name %in% third_removed_actors) %>% 
+  pull(title) %>% 
+  unique()
+
+
+fourth_removed_actors <- nfx %>% filter(title %in% third_removed_movies) %>% 
+  pull(individual_name) %>% 
+  unique()
+
+fourth_removed_movies <- nfx %>% 
+  filter(individual_name %in% fourth_removed_actors) %>% 
+  pull(title) %>% 
+  unique()
+
+fifth_removed_actors <- nfx %>% filter(title %in% fourth_removed_movies) %>% 
+  pull(individual_name) %>% 
+  unique()
+
+fifth_removed_movies <- nfx %>% 
+  filter(individual_name %in% fifth_removed_actors) %>% 
+  pull(title) %>% 
+  unique()
+
+
+sixth_removed_actors <- nfx %>% filter(title %in% fifth_removed_movies) %>% 
+  pull(individual_name) %>% 
+  unique()
+
+
+```
+
+So, I found 28,163 out of 32,882 movies within six degrees of Kevin Bacon. Now I need to make a network dataset, so each actor must be de-duplicated. 
+
+
+```{r}
+# Making indicators for each group
+nfx <- nfx %>% 
+  mutate(
+    kevin_bacon = individual_name == 'Kevin Bacon',
+    one_degrees = individual_name %in% first_removed_actors,
+    two_degrees = individual_name %in% second_removed_actors,
+    three_degrees = individual_name %in% third_removed_actors,
+    four_degrees = individual_name %in% fourth_removed_actors,
+    five_degrees = individual_name %in% fifth_removed_actors,
+    six_degrees = individual_name %in% sixth_removed_actors
+  )
+
+# Keeping only the first time one of the degrees was true
+final_nfx <- nfx %>% pivot_longer(cols = kevin_bacon:six_degrees, names_to = "degree") %>% 
+  group_by(individual_name) %>% 
+  filter(value) %>% 
+  filter(row_number(value) == 1) %>% 
+  arrange(individual_name)
+
+
+```
+
+
+
+---
+
+Charlie Gallagher, May 2021
+
